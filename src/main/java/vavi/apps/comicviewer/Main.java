@@ -21,7 +21,6 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
-import java.awt.image.BufferedImageOp;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -42,7 +41,6 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 import vavi.awt.dnd.BasicDTListener;
-import vavi.awt.image.resample.FfmpegResampleOp;
 import vavi.util.Debug;
 
 
@@ -193,132 +191,33 @@ Debug.println("LEFT : " + (index + 1) + ": " + images.get(index + 1));
                         i2h = i2.getHeight();
                     }
 
-                    final int m = 2;
-                    switch (m) {
-                    case 1: {
-                        // TODO when window is larger than image
-                        float scale;
+                    // https://stackoverflow.com/a/10245583
+                    float sw = 1;
+                    float sh = 1;
+                    if (i1w > w) {
+                        sw = w / (float) i1w;
+                    }
+                    if (i1h * sw > h) {
+                        sh = h / (float) i1h;
+                    }
+                    float s = Math.min(sw, sh);
+                    int nw1 = (int) (i1w * s);
+                    int nh1 = (int) (i1h * s);
+                    g.drawImage(i1, w, (h - nh1) / 2, nw1, nh1, null);
 
-                        float s1;
-                        float sx1 = (float) i1w / w;
-                        sx1 = sx1 > 1 ? 1 / sx1 : sx1;
-                        float sy1 = (float) i1h / h;
-                        sy1 = sy1 > 1 ? 1 / sy1 : sy1;
-                        s1 = Math.min(sx1, sy1);
-                        scale = s1;
-//Debug.println("s1: " + s1);
-                        float s2;
-                        if (i2 != null) {
-                            float sx2 = (float) i2w / w;
-                            sx2 = sx2 > 1 ? 1 / sx2 : sx2;
-                            float sy2 = (float) i2h / h;
-                            sy2 = sy2 > 1 ? 1 / sy2 : sy2;
-                            s2 = Math.min(sx2, sy2);
-//Debug.println("s2: " + s2);
-                            scale = Math.min(s1, s2);
+                    if (i2 != null) {
+                        sw = 1;
+                        sh = 1;
+                        if (i2w > w) {
+                            sw = w / (float) i2w;
                         }
-                        Debug.println("scale: " + scale);
-                        int w1 = (int) (i1w * scale);
-                        int h1 = (int) (i1h * scale);
-                        g.drawImage(i1, w, (h - h1) / 2, w1, h1, null);
-                        if (i2 != null) {
-                            int w2 = (int) (i2w * scale);
-                            int h2 = (int) (i2h * scale);
-                            g.drawImage(i2, w - w2, (h - h2) / 2, w2, h2, null);
+                        if (i2h * sw > h) {
+                            sw = h / (float) i2h;
                         }
-                        break;
-                    }
-                    case 2: {
-                        // https://stackoverflow.com/a/10245583
-                        int nw1 = i1w;
-                        int nh1 = i1h;
-                        if (i1w > w) {
-                            nw1 = w;
-                            nh1 = (int) (i1h * nw1 / (float) i1w);
-                        }
-                        if (nh1 > h) {
-                            nh1 = h;
-                            nw1 = (int) (nh1 * i1w / (float) i1h);
-                        }
-//                        if (nh1 < h) {
-//                            nh1 = h;
-//                            nw1 = (int) (i1w * nh1 / (float) i1h);
-//                        }
-//                        if (i1w < w) {
-//                            nw1 = w;
-//                            nh1 = (int) (i1h * nw1 / (float) i1w);
-//                        }
-                        g.drawImage(i1, w, (h - nh1) / 2, nw1, nh1, null);
-                        if (i2 != null) {
-                            int nw2 = i2w;
-                            int nh2 = i2h;
-                            if (i2w > w) {
-                                nw2 = w;
-                                nh2 = (int) (nw2 * i2h / (float) i2w);
-                            }
-                            if (nh2 > h) {
-                                nh2 = h;
-                                nw2 = (int) (nh2 * i2w / (float) i2h);
-                            }
-                            g.drawImage(i2, w - nw2, (h - nh2) / 2, nw2, nh2, null);
-                        }
-                        break;
-                    }
-                    case 3: {
-                        // aspect ratio
-                        // https://stackoverflow.com/a/30494623
-                        // TODO w:h is not correct, getWidth/Height are wired
-                        AspectRatio ar1 = new AspectRatio(i1w, i1h);
-                        int nh1 = ar1.getWidth(w);
-                        int nw1 = ar1.getHeight(nh1);
-                        if (nh1 > h) {
-                            nw1 = ar1.getHeight(h);
-                            nh1 = ar1.getWidth(nw1);
-                        }
-                        g.drawImage(i1, w, (h - nh1) / 2, nw1, nh1, null);
-                        if (i2 != null) {
-                            AspectRatio ar2 = new AspectRatio(i2w, i2h);
-                            int nh2 = ar2.getWidth(w);
-                            int nw2 = ar2.getHeight(nh2);
-                            if (nh2 > h) {
-                                nw2 = ar2.getHeight(h);
-                                nh2 = ar2.getWidth(nw2);
-                            }
-                            g.drawImage(i2, w - nw2, (h - nh2) / 2, nw2, nh2, null);
-                        }
-                        break;
-                    }
-                    case 4: {
-                        // aspect ratio, ffmpeg
-                        // https://stackoverflow.com/a/30494623
-                        // TODO w:h is not correct, getWidth/Height are wired
-                        AspectRatio ar1 = new AspectRatio(i1w, i1h);
-                        float scale;
-                        int nh1 = ar1.getWidth(w);
-                        int nw1 = ar1.getHeight(nh1);
-                        scale = (float) nw1 / i1w;
-                        if (nh1 > h) {
-                            nw1 = ar1.getHeight(h);
-                            nh1 = ar1.getWidth(nw1);
-                            scale = (float) nh1 / i1h;
-                        }
-                        BufferedImageOp filter = new FfmpegResampleOp(scale, scale);
-                        g.drawImage(filter.filter(i1, null), w, (h - nh1) / 2, null);
-                        if (i2 != null) {
-                            AspectRatio ar2 = new AspectRatio(i2w, i2h);
-                            int nh2 = ar2.getWidth(w);
-                            int nw2 = ar2.getHeight(nh2);
-                            scale = (float) nw2 / i2w;
-                            if (nh2 > h) {
-                                nw2 = ar2.getHeight(h);
-                                nh2 = ar2.getWidth(nw2);
-                                scale = (float) nh2 / i2h;
-                            }
-                            filter = new FfmpegResampleOp(scale, scale);
-                            g.drawImage(filter.filter(i2, null), w - nw2, (h - nh2) / 2, null);
-                        }
-                        break;
-                    }
+                        s = Math.min(sw, sh);
+                        int nw2 = (int) (i2w * s);
+                        int nh2 = (int) (i2h * s);
+                        g.drawImage(i2, w - nw2, (h - nh2) / 2, nw2, nh2, null);
                     }
                 } catch (IOException e) {
                     Debug.println(e.getMessage());
@@ -363,23 +262,5 @@ Debug.println("index: " + index);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.pack();
         frame.setVisible(true);
-    }
-
-    static class AspectRatio {
-        private final double ratio;
-
-        AspectRatio(int x, int y) {
-            this.ratio = (double) x / y;
-        }
-
-        int getHeight(int length) {
-            double height = length / Math.sqrt((Math.pow(ratio, 2d) + 1));
-            return Math.round((float) height);
-        }
-
-        int getWidth(int length) {
-            double width = length / Math.sqrt(1d / (Math.pow(ratio, 2d) + 1));
-            return Math.round((float) width);
-        }
     }
 }
