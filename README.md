@@ -5,9 +5,11 @@
 
 # vavi-apps-comicviewer
 
+<image src="https://repository-images.githubusercontent.com/534397011/27e695b5-6224-4edd-8fb8-d8dbf8bd14b8" width="640"/>
+
 the comic viewer avif supported.<br/>
 this is a stopgap until Ventura (support avif natively) release.
 
 ## TODO
 
- * resizing when the window is larger than an image.
+ * ~~resizing when the window is larger than an image~~
