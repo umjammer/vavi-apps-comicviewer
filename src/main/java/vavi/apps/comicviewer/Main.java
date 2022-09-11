@@ -6,11 +6,16 @@
 
 package vavi.apps.comicviewer;
 
+import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.Shape;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
@@ -20,6 +25,10 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.font.FontRenderContext;
+import java.awt.font.TextAttribute;
+import java.awt.font.TextLayout;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -29,13 +38,17 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.AttributedCharacterIterator;
+import java.text.AttributedString;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -62,55 +75,175 @@ public class Main {
         if (args.length > 0) {
             Path p = Paths.get(args[0]);
             if (Files.exists(p)) {
-                app.init(p);
+                app.init(p, 0);
+            }
+        } else {
+            String p = app.prefs.get("lastPath", null);
+            if (p != null) {
+                Path path = Paths.get(p);
+                if (Files.exists(path)){
+                    int index = app.prefs.getInt("lastIndex", 0);
+                    app.init(path, index);
+                }
             }
         }
     }
 
-    void init(Path path) throws IOException {
+    static final String[] archiveExts = {"zip", "cbz", "rar", "lha", "cab", "7z", "arj"};
+
+    String getExt(Path path) {
+        String filename = path.getFileName().toString();
+        return filename.substring(filename.indexOf('.') + 1).toLowerCase();
+    }
+
+    boolean isArchive(Path path) {
+        return !Files.isDirectory(path) && Arrays.asList(archiveExts).contains(getExt(path));
+    }
+
+    static final String[] imageExts = {"avif", "jpg", "jpeg", "png", ""};
+
+    boolean isImage(Path path) {
+Debug.println("path: " + path.getFileName() + (Files.isDirectory(path) ? "" : ", " + getExt(path)));
+        return !Files.isDirectory(path) && Arrays.asList(imageExts).contains(getExt(path));
+    }
+
+    void init(Path path, int index) throws IOException {
+        this.path = path;
+        this.index = index;
+
         images.clear();
         cache.clear();
-        index = 0;
         if (es != null && !es.isTerminated()) {
             es.shutdownNow();
         }
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+Debug.println("shutdownHook");
+            prefs.put("lastPath", this.path.toString());
+            prefs.putInt("lastIndex", this.index);
+            prefs.putInt("lastX", this.frame.getX());
+            prefs.putInt("lastY", this.frame.getY());
+            prefs.putInt("lastWidth", this.panel.getWidth());
+            prefs.putInt("lastHeight", this.panel.getHeight());
+        }));
 
-        URI uri = URI.create("archive:" + path.toUri());
-Debug.println(uri);
-        FileSystem fs = FileSystems.newFileSystem(uri, Collections.emptyMap());
-        Files.list(fs.getRootDirectories().iterator().next())
-                .filter(p -> !Files.isDirectory(p))
+        Path virtualRoot;
+        if (!isArchive(path)) {
+            virtualRoot = path;
+        } else {
+            URI uri = URI.create("archive:" + path.toUri());
+Debug.println("open fs: " + uri);
+            if (fs != null) {
+                fs.close();
+            }
+            fs = FileSystems.newFileSystem(uri, Collections.emptyMap());
+            virtualRoot = fs.getRootDirectories().iterator().next();
+        }
+Debug.println(virtualRoot);
+        Files.walk(virtualRoot)
+                .filter(this::isImage)
                 .sorted()
                 .forEach(images::add);
         panel.repaint();
 
         es = Executors.newSingleThreadExecutor();
         es.submit(() -> {
-           for (int i = 2; i < images.size(); i++) {
-               BufferedImage image = cache.get(i);
-               if (image == null) {
-                   try {
-Debug.println("CACHE: " + i + ": " + images.get(i));
-                       image = ImageIO.read(Files.newInputStream(images.get(i)));
-                       cache.put(i, image);
-                   } catch (IOException e) {
-                       Debug.println(e.getMessage());
-                   }
-               }
-           }
+            // don't disturb before first 2 pages are shown
+            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+            for (int i = index + 2; i < images.size(); i++) {
+                getImage(i);
+                // create gap for paging
+                Thread.yield();
+            }
+            for (int i = 0; i < index; i++) {
+                getImage(i);
+                // create gap for paging
+                Thread.yield();
+            }
 Debug.println("CACHE: done");
-           es.shutdown();
+            es.shutdown();
+            if (fs != null) {
+               try {
+                   fs.close();
+Debug.println("close fs");
+               } catch (IOException e) {
+Debug.println(e);
+               }
+               fs = null;
+           }
         });
     }
 
+    BufferedImage getImage(int i) {
+        synchronized (cache) {
+            BufferedImage image = cache.get(i);
+            if (image == null) {
+                try {
+Debug.println("CACHE: " + i + ": " + images.get(i));
+                    image = ImageIO.read(Files.newInputStream(images.get(i)));
+                    cache.put(i, image);
+                } catch (IOException e) {
+Debug.println(e.getMessage());
+                }
+            }
+            return image;
+        }
+    }
+
+    Preferences prefs = Preferences.userNodeForPackage(Main.class);
     ExecutorService es;
-    JPanel panel;
+
+    FileSystem fs;
     List<Path> images = new ArrayList<>();
-    int index = 0;
     final Map<Integer, BufferedImage> cache = new HashMap<>();
 
+    JFrame frame;
+    JPanel panel;
+
+    Path path;
+    int index = 0;
+
+    void nextPage(int d) {
+        if (index + d < images.size() - 1) {
+            index += d;
+        }
+    }
+
+    void prevPage(int d) {
+        if (index >= d) {
+            index -= d;
+        }
+    }
+
     void gui() {
-        JFrame frame = new JFrame();
+        int x = prefs.getInt("lastX", 0);
+        int y = prefs.getInt("lastY", 0);
+        int w = prefs.getInt("lastWidth", 1600);
+        int h = prefs.getInt("lastHeight", 1200);
+
+        frame = new JFrame();
+        frame.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                int d = (e.getModifiers() & KeyEvent.SHIFT_MASK) != 0 ? 1 : 2;
+                Debug.println("move: " + d);
+                switch (e.getKeyCode()) {
+                case KeyEvent.VK_LEFT:
+                    nextPage(d);
+                    break;
+                case KeyEvent.VK_RIGHT:
+                    prevPage(d);
+                    break;
+                }
+                panel.repaint();
+                Debug.println("index: " + index);
+            }
+        });
+        frame.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                panel.repaint();
+            }
+        });
 
         panel = new JPanel() {
             {
@@ -141,122 +274,106 @@ Debug.println("CACHE: done");
                             @Override
                             protected boolean dropImpl(DropTargetDropEvent ev, Object data) {
                                 try {
-                                    init(Paths.get(((List<File>) data).get(0).getPath()));
+                                    System.setProperty("vavi.util.archive.zip.encoding", "utf-8");
+                                    init(Paths.get(((List<File>) data).get(0).getPath()), 0);
                                     return true;
                                 } catch (IOException e) {
                                     e.printStackTrace();
+                                    return false;
+                                } catch (IllegalArgumentException e) {
+                                    if (e.getMessage().equals("MALFORMED")) {
+Debug.println("zip reading failure by utf-8, retry using ms932");
+                                        try {
+                                            System.setProperty("vavi.util.archive.zip.encoding", "ms932");
+                                            init(Paths.get(((List<File>) data).get(0).getPath()), 0);
+                                            return true;
+                                        } catch (IOException f) {
+                                            f.printStackTrace();
+                                        }
+                                    } else {
+                                        e.printStackTrace();
+                                    }
                                     return false;
                                 }
                             }
                         },
                         true);
             }
+            void drawText(Graphics g, String text, String fontName, int point, int ratio) {
+                Font font = new Font(fontName, Font.PLAIN, point);
+
+                float stroke = point / (float) ratio;
+
+                Graphics2D graphics = (Graphics2D) g;
+                graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                FontRenderContext frc = graphics.getFontRenderContext();
+
+                AttributedString as = new AttributedString(text);
+                as.addAttribute(TextAttribute.FONT, font, 0, text.length());
+                AttributedCharacterIterator aci = as.getIterator();
+
+                TextLayout tl = new TextLayout(aci, frc);
+                float sw = (float) tl.getBounds().getWidth();
+                float sh = (float) tl.getBounds().getHeight();
+                Shape shape = tl.getOutline(AffineTransform.getTranslateInstance((getWidth() - sw) / 2, (getHeight() - sh) / 2));
+                graphics.setColor(Color.black);
+                graphics.setStroke(new BasicStroke(stroke));
+                graphics.draw(shape);
+                graphics.setColor(Color.white);
+                graphics.fill(shape);
+            }
+            // https://stackoverflow.com/a/10245583
+            void drawPage(Graphics g, BufferedImage image, boolean right) {
+                int w = getWidth() / 2;
+                int h = getHeight();
+                int iw = image.getWidth();
+                int ih = image.getHeight();
+                float sw = 1;
+                float sh = 1;
+                if (iw > w) {
+                    sw = w / (float) iw;
+                }
+                if (ih * sw > h) {
+                    sh = h / (float) ih;
+                }
+                float s = Math.min(sw, sh);
+                int nw = (int) (iw * s);
+                int nh = (int) (ih * s);
+                g.drawImage(image, right ? w : w - nw, (h - nh) / 2, nw, nh, null);
+            }
             public void paint(Graphics g) {
                 super.paint(g);
 
-                if (images.size() == 0) return;
+                if (images.size() == 0) {
+                    String text = "Drop an archive file or a folder here";
+                    drawText(g, text, "San Serif", 20, 12);
+                    return;
+                }
 
                 frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-                try {
-                    BufferedImage i1;
-                    BufferedImage i2 = null;
-                    i1 = cache.get(index);
-                    if (i1 == null) {
-Debug.println("RIGHT: " + index + ": " + images.get(index));
-                        i1 = ImageIO.read(Files.newInputStream(images.get(index)));
-                        synchronized (cache) {
-                            cache.put(index, i1);
-                        }
-                    }
-                    if (index + 1 < images.size() - 1) {
-                        i2 = cache.get(index + 1);
-                        if (i2 == null) {
-Debug.println("LEFT : " + (index + 1) + ": " + images.get(index + 1));
-                            i2 = ImageIO.read(Files.newInputStream(images.get(index + 1)));
-                            synchronized (cache) {
-                                cache.put(index + 1, i2);
-                            }
-                        }
-                    }
+                BufferedImage i1 = getImage(index);
+                BufferedImage i2 = null;
+                if (index + 1 < images.size() - 1) {
+                    i2 = getImage(index + 1);
+                }
 
-                    int w = getWidth() / 2;
-                    int h = getHeight();
-                    int i1w = i1.getWidth();
-                    int i1h = i1.getHeight();
-                    int i2w = 0;
-                    int i2h = 0;
-                    if (i2 != null) {
-                        i2w = i2.getWidth();
-                        i2h = i2.getHeight();
-                    }
-
-                    // https://stackoverflow.com/a/10245583
-                    float sw = 1;
-                    float sh = 1;
-                    if (i1w > w) {
-                        sw = w / (float) i1w;
-                    }
-                    if (i1h * sw > h) {
-                        sh = h / (float) i1h;
-                    }
-                    float s = Math.min(sw, sh);
-                    int nw1 = (int) (i1w * s);
-                    int nh1 = (int) (i1h * s);
-                    g.drawImage(i1, w, (h - nh1) / 2, nw1, nh1, null);
-
-                    if (i2 != null) {
-                        sw = 1;
-                        sh = 1;
-                        if (i2w > w) {
-                            sw = w / (float) i2w;
-                        }
-                        if (i2h * sw > h) {
-                            sw = h / (float) i2h;
-                        }
-                        s = Math.min(sw, sh);
-                        int nw2 = (int) (i2w * s);
-                        int nh2 = (int) (i2h * s);
-                        g.drawImage(i2, w - nw2, (h - nh2) / 2, nw2, nh2, null);
-                    }
-                } catch (IOException e) {
-                    Debug.println(e.getMessage());
+                if (i1 != null) {
+                    drawPage(g, i1, true);
+                }
+                if (i2 != null) {
+                    drawPage(g, i2, false);
                 }
 
                 frame.setCursor(Cursor.getDefaultCursor());
             }
         };
-        frame.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                int d = (e.getModifiers() & KeyEvent.SHIFT_MASK) != 0 ? 1 : 2;
-Debug.println("move: " + d);
-                switch (e.getKeyCode()) {
-                case KeyEvent.VK_LEFT:
-                    if (index + d < images.size() - 1) {
-                        index += d;
-                    }
-                    break;
-                case KeyEvent.VK_RIGHT:
-                    if (index >= d) {
-                        index -= d;
-                    }
-                    break;
-                }
-                panel.repaint();
-Debug.println("index: " + index);
-            }
-        });
-        frame.addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentResized(ComponentEvent e) {
-                panel.repaint();
-            }
-        });
         panel.setBackground(Color.black);
-        panel.setPreferredSize(new Dimension(1600, 1200));
+        panel.setPreferredSize(new Dimension(w, h));
         panel.setLayout(new BorderLayout());
 
+        frame.setLocation(x, y);
         frame.setContentPane(panel);
         frame.setTitle("ComicViewer");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
