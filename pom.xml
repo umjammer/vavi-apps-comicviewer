@@ -7,6 +7,11 @@
   <artifactId>vavi-apps-comicviewer</artifactId>
   <version>0.0.1-SNAPSHOT</version>
 
+  <properties>
+    <javapackager.name>zzzVewer</javapackager.name>
+    <javapackager.assetsDir>src/main/package</javapackager.assetsDir>
+  </properties>
+
   <build>
     <plugins>
       <plugin>
@@ -17,31 +22,101 @@
           <source>1.8</source>
           <target>1.8</target>
           <encoding>utf-8</encoding>
+          <compilerArgs>
+            <arg>-XDignore.symbol.file</arg> <!-- for com.apple.eawt -->
+          </compilerArgs>
+          <!-- https://stackoverflow.com/a/30472473 -->
+          <fork>true</fork>
         </configuration>
       </plugin>
 
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <version>3.3.0</version>
+        <groupId>pl.project13.maven</groupId>
+        <artifactId>git-commit-id-plugin</artifactId>
+        <version>4.9.10</version>
         <executions>
           <execution>
-            <id>copy</id>
-            <phase>generate-resources</phase>
+            <id>get-the-git-infos</id>
             <goals>
-              <goal>copy</goal>
+              <goal>revision</goal>
+            </goals>
+            <phase>initialize</phase>
+          </execution>
+        </executions>
+        <configuration>
+          <generateGitPropertiesFile>false</generateGitPropertiesFile>
+          <includeOnlyProperties>
+            <includeOnlyProperty>^git.build.(time|version)$</includeOnlyProperty>
+          </includeOnlyProperties>
+          <commitIdGenerationMode>full</commitIdGenerationMode>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>io.github.fvarrui</groupId>
+        <artifactId>javapackager</artifactId>
+        <version>1.7.0-SNAPSHOT</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>package</goal>
             </goals>
             <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>vavi</groupId>
-                  <artifactId>vavi-image-ffmpeg</artifactId>
-                  <type>dylib</type>
-                  <overWrite>true</overWrite>
-                  <outputDirectory>${project.build.testOutputDirectory}</outputDirectory>
-                  <destFileName>libFfmpegResampleOpWrapper.dylib</destFileName>
-                </artifactItem>
-              </artifactItems>
+              <name>${javapackager.name}</name>
+              <organizationName>Copyright © 2022 by vavi, All rights reserved.</organizationName>
+
+              <mainClass>vavi.apps.comicviewer.Main</mainClass>
+              <runnableJar>${project.artifactId}-${project.version}.jar</runnableJar>
+              <bundleJre>false</bundleJre>
+              <generateInstaller>false</generateInstaller>
+
+              <assetsDir>${javapackager.assetsDir}</assetsDir>
+
+              <additionalResources>
+                <additionalResource>${project.build.testOutputDirectory}/librococoa.dylib</additionalResource>
+              </additionalResources>
+
+              <vmArgs>
+                <vmArg>-Djna.library.path=/usr/local/lib</vmArg>
+                <vmArg>-Dapple.laf.useScreenMenuBar=true</vmArg>
+              </vmArgs>
+
+              <bundleJre>true</bundleJre>
+              <jrePath>${java.home}</jrePath>
+
+              <macConfig>
+                <!-- true cause error -->
+                <codesignApp>false</codesignApp>
+                <infoPlist>
+                  <additionalEntries>
+                    <![CDATA[
+                      <key>CFBundleName</key>
+                      <string>${javapackager.name}</string>
+                      <key>CFBundleShortVersionString</key>
+                      <string>${git.build.time}</string>
+                      <key>CFBundleDocumentTypes</key>
+                      <array>
+                        <dict>
+                          <key>CFBundleTypeExtensions</key>
+                          <array>
+                            <string>zip</string>
+                            <string>ZIP</string>
+                          </array>
+                          <key>CFBundleTypeName</key>
+                          <string>ZIP Archive</string>
+                          <key>CFBundleTypeRole</key>
+                          <string>Viewer</string>
+                          <key>LSTypeIsPackage</key>
+                          <false/>
+                          <key>NSPersistentStoreTypeKey</key>
+                          <string>Binary</string>
+                        </dict>
+                      </array>
+                    ]]>
+                  </additionalEntries>
+                </infoPlist>
+              </macConfig>
             </configuration>
           </execution>
         </executions>
@@ -54,7 +129,6 @@
         <configuration>
           <argLine>
             -Djava.util.logging.config.file=${project.build.testOutputDirectory}/logging.properties
-            -Djava.library.path=target/test-classes
             -Djna.library.path=/usr/local/lib
           </argLine>
           <trimStackTrace>false</trimStackTrace>

@@ -33,8 +33,10 @@ import java.awt.font.TextLayout;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.URI;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -55,8 +57,10 @@ import java.util.logging.Level;
 import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
+import com.apple.eawt.Application;
 import vavi.awt.dnd.BasicDTListener;
 import vavi.util.Debug;
 
@@ -91,7 +95,34 @@ Debug.println("shutdownHook");
             if (Files.exists(p)) {
                 app.init(p, 0);
             }
-            } else {
+        } else {
+            String osName = System.getProperty("os.name").toLowerCase();
+            // existing `CFProcessPath` means this program is executed by .app
+            if (osName.contains("mac") && System.getenv("CFProcessPath") != null) {
+                try {
+                    // https://alvinalexander.com/blog/post/jfc-swing/java-handle-drag-drop-events-mac-osx-dock-application-icon-2/
+                    Application application = Application.getApplication();
+                    // TODO OpenFileHandler is <= 1.8
+                    application.setOpenFileHandler(openFilesEvent -> {
+                        List<File> files = openFilesEvent.getFiles();
+Debug.println(Level.FINE, "files: " + files.size() + ", " + (files.size() > 0 ? files.get(0) : ""));
+                        try {
+                            app.init(Paths.get(files.get(0).getPath()), 0);
+                        } catch (IOException e) {
+                            Debug.println(e);
+                        }
+                    });
+                } catch (Throwable ex) {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    PrintWriter pr = new PrintWriter(baos);
+                    ex.printStackTrace(pr);
+                    pr.flush();
+                    pr.close();
+JOptionPane.showMessageDialog(null, baos.toString(), ex.getMessage(), JOptionPane.ERROR_MESSAGE);
+                }
+            }
+
+            if (app.path == null) {
                 String p = app.prefs.get("lastPath", null);
                 if (p != null) {
                     Path path = Paths.get(p);
@@ -102,6 +133,7 @@ Debug.println("shutdownHook");
                 }
             }
         }
+    }
 
     static final String[] archiveExts = {"zip", "cbz", "rar", "lha", "cab", "7z", "arj"};
 

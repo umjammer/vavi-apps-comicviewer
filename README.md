@@ -5,7 +5,7 @@
 
 # vavi-apps-comicviewer
 
-<image src="https://repository-images.githubusercontent.com/534397011/27e695b5-6224-4edd-8fb8-d8dbf8bd14b8" width="640"/>
+<a href="https://brandmark.io/"><image src="https://repository-images.githubusercontent.com/534397011/27e695b5-6224-4edd-8fb8-d8dbf8bd14b8" width="640"/></a>
 
 the comic viewer avif supported.<br/>
 this is a stopgap until Ventura (support avif natively) release.
@@ -20,3 +20,12 @@ this is a stopgap until Ventura (support avif natively) release.
 ## TODO
 
  * ~~resizing when the window is larger than an image~~
+ * [jpackager](https://github.com/fvarrui/JavaPackager)
+   * application title
+     * ~~`-Dapple.awt.application.name=Foo` doesn't work~~
+     * use `macConfig.infoPlist.additionalEntries` key:`CFBundleName`
+   * `macConfig.icnsFile` doesn't work?
+   * drop into mac application
+     * info.plist? -> right, use `CFBundleTypeExtensions` for accepting to drop
+     * `CFProcessPath`? -> env
+     * info.plist `:Javax:JVMVersion` doesn't work
