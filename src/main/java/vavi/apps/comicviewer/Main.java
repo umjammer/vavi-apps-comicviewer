@@ -118,6 +118,7 @@ Debug.println("path: " + path.getFileName() + (Files.isDirectory(path) ? "" : ",
         cache.clear();
         if (es != null && !es.isTerminated()) {
             es.shutdownNow();
+            while (!es.isTerminated()) Thread.yield();
         }
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 Debug.println("shutdownHook");
