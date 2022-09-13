@@ -93,7 +93,7 @@ public class Main {
 
     String getExt(Path path) {
         String filename = path.getFileName().toString();
-        return filename.substring(filename.indexOf('.') + 1).toLowerCase();
+        return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
     }
 
     boolean isArchive(Path path) {
