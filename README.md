@@ -10,7 +10,13 @@
 the comic viewer avif supported.<br/>
 this is a stopgap until Ventura (support avif natively) release.
 
+## Usage
+
+ * open ... drop an archive or a folder into the application window
+ * next ... ^N, click the left page, left arrow (with shift key ... shift 1 page next)
+ * prev ... ^P, click the right page, right arrow (with shift key ... shift 1 page prev)
  * magnify ... click w/ the command key and drag
+
 ## TODO
 
  * ~~resizing when the window is larger than an image~~

@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
 import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
@@ -74,39 +75,49 @@ public class Main {
     public static void main(String[] args) throws Exception {
 
         Main app = new Main();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+Debug.println("shutdownHook");
+            app.prefs.putInt("lastIndex", app.index);
+            app.prefs.putInt("lastX", app.frame.getX());
+            app.prefs.putInt("lastY", app.frame.getY());
+            app.prefs.putInt("lastWidth", Math.max(app.panel.getWidth(), 160));
+            app.prefs.putInt("lastHeight", Math.max(app.panel.getHeight(), 120));
+            app.prefs.put("lastPath", String.valueOf(app.path));
+        }));
+        // create and display a simple jframe
         app.gui();
         if (args.length > 0) {
             Path p = Paths.get(args[0]);
             if (Files.exists(p)) {
                 app.init(p, 0);
             }
-        } else {
-            String p = app.prefs.get("lastPath", null);
-            if (p != null) {
-                Path path = Paths.get(p);
-                if (Files.exists(path)){
-                    int index = app.prefs.getInt("lastIndex", 0);
-                    app.init(path, index);
+            } else {
+                String p = app.prefs.get("lastPath", null);
+                if (p != null) {
+                    Path path = Paths.get(p);
+                    if (Files.exists(path)){
+                        int index = app.prefs.getInt("lastIndex", 0);
+                        app.init(path, index);
+                    }
                 }
             }
         }
-    }
 
     static final String[] archiveExts = {"zip", "cbz", "rar", "lha", "cab", "7z", "arj"};
 
-    String getExt(Path path) {
+    static String getExt(Path path) {
         String filename = path.getFileName().toString();
         return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
     }
 
-    boolean isArchive(Path path) {
+    static boolean isArchive(Path path) {
         return !Files.isDirectory(path) && Arrays.asList(archiveExts).contains(getExt(path));
     }
 
     static final String[] imageExts = {"avif", "jpg", "jpeg", "png", ""};
 
-    boolean isImage(Path path) {
-Debug.println("path: " + path.getFileName() + (Files.isDirectory(path) ? "" : ", " + getExt(path)));
+    static boolean isImage(Path path) {
+Debug.println(Level.FINE, "path: " + path.getFileName() + (Files.isDirectory(path) ? "" : ", " + getExt(path)));
         return !Files.isDirectory(path) && Arrays.asList(imageExts).contains(getExt(path));
     }
 
@@ -120,15 +131,6 @@ Debug.println("path: " + path.getFileName() + (Files.isDirectory(path) ? "" : ",
             es.shutdownNow();
             while (!es.isTerminated()) Thread.yield();
         }
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-Debug.println("shutdownHook");
-            prefs.put("lastPath", this.path.toString());
-            prefs.putInt("lastIndex", this.index);
-            prefs.putInt("lastX", this.frame.getX());
-            prefs.putInt("lastY", this.frame.getY());
-            prefs.putInt("lastWidth", this.panel.getWidth());
-            prefs.putInt("lastHeight", this.panel.getHeight());
-        }));
 
         Path virtualRoot;
         if (!isArchive(path)) {
@@ -144,9 +146,11 @@ Debug.println("open fs: " + uri);
         }
 Debug.println(virtualRoot);
         Files.walk(virtualRoot)
-                .filter(this::isImage)
+                .filter(Main::isImage)
                 .sorted()
                 .forEach(images::add);
+Debug.println("images: " + images.size());
+        frame.setTitle("zzzViewer - " + path.getFileName());
         panel.repaint();
 
         es = Executors.newSingleThreadExecutor();
@@ -193,10 +197,12 @@ Debug.println(e.getMessage());
         }
     }
 
+    // app
     Preferences prefs = Preferences.userNodeForPackage(Main.class);
     ExecutorService es;
-
     FileSystem fs;
+
+    // view-model
     List<Path> images = new ArrayList<>();
     final Map<Integer, BufferedImage> cache = new HashMap<>();
     BufferedImage imageR;
@@ -205,9 +211,11 @@ Debug.println(e.getMessage());
     Rectangle rectL = new Rectangle();
     float scaleL, scaleR;
 
+    // view
     JFrame frame;
     JPanel panel;
 
+    // model
     Path path;
     int index = 0;
 
@@ -233,8 +241,8 @@ Debug.println(e.getMessage());
         frame.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
-                int d = (e.getModifiers() & KeyEvent.SHIFT_MASK) != 0 ? 1 : 2;
-                Debug.println("move: " + d);
+                int d = e.isShiftDown() ? 1 : 2;
+Debug.println("move: " + d);
                 switch (e.getKeyCode()) {
                 case KeyEvent.VK_LEFT:
                     nextPage(d);
@@ -242,9 +250,19 @@ Debug.println(e.getMessage());
                 case KeyEvent.VK_RIGHT:
                     prevPage(d);
                     break;
+                case KeyEvent.VK_N:
+                    if (e.isControlDown()) {
+                        nextPage(d);
+                    }
+                    break;
+                case KeyEvent.VK_P:
+                    if (e.isControlDown()) {
+                        prevPage(d);
+                    }
+                    break;
                 }
                 panel.repaint();
-                Debug.println("index: " + index);
+Debug.println("index: " + index);
             }
         });
         frame.addComponentListener(new ComponentAdapter() {
@@ -381,12 +399,12 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
                 float sh = 1;
                 float s;
                 if (iw > w || ih > h) {
-                if (iw > w) {
-                    sw = w / (float) iw;
-                }
-                if (ih * sw > h) {
-                    sh = h / (float) ih;
-                }
+                    if (iw > w) {
+                        sw = w / (float) iw;
+                    }
+                    if (ih * sw > h) {
+                        sh = h / (float) ih;
+                    }
                     s = Math.min(sw, sh);
                 } else {
                     if (w > iw) {
@@ -450,6 +468,17 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
                 magnify.setVisible(false);
                 magnify.repaint();
             }
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int d = e.isShiftDown() ? 1 : 2;
+                if (rectL.contains(e.getX(), e.getY())) {
+                    nextPage(d);
+                } else if (rectR.contains(e.getX(), e.getY())) {
+                    prevPage(d);
+                };
+                panel.repaint();
+            }
         });
         panel.addMouseMotionListener(new MouseAdapter() {
             @Override
@@ -466,7 +495,6 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
 
         frame.setLocation(x, y);
         frame.setContentPane(panel);
-        frame.setTitle("ComicViewer");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.pack();
         frame.setVisible(true);
