@@ -14,6 +14,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.datatransfer.DataFlavor;
@@ -195,6 +196,11 @@ Debug.println(e.getMessage());
     FileSystem fs;
     List<Path> images = new ArrayList<>();
     final Map<Integer, BufferedImage> cache = new HashMap<>();
+    BufferedImage imageR;
+    BufferedImage imageL;
+    Rectangle rectR = new Rectangle();
+    Rectangle rectL = new Rectangle();
+    float scaleL, scaleR;
 
     JFrame frame;
     JPanel panel;
@@ -331,19 +337,33 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
                 int ih = image.getHeight();
                 float sw = 1;
                 float sh = 1;
+                float s;
+                if (iw > w || ih > h) {
                 if (iw > w) {
                     sw = w / (float) iw;
                 }
                 if (ih * sw > h) {
                     sh = h / (float) ih;
                 }
-                float s = Math.min(sw, sh);
+                    s = Math.min(sw, sh);
+                } else {
+                    if (w > iw) {
+                        sw = (float) iw / w;
+                    }
+                    if (ih * sw < h) {
+                        sh = (float) ih / h;
+                    }
+                    s = 1 / Math.max(sw, sh);
+                }
                 int nw = (int) (iw * s);
                 int nh = (int) (ih * s);
                 g.drawImage(image, right ? w : w - nw, (h - nh) / 2, nw, nh, null);
+                Rectangle r = right ? rectR : rectL;
+                r.setBounds(right ? w : w - nw, (h - nh) / 2, nw, nh);
+                if (right) scaleR = s; else scaleL = s;
             }
-            public void paint(Graphics g) {
-                super.paint(g);
+            public void paintComponent(Graphics g) {
+                super.paintComponent(g);
 
                 if (images.size() == 0) {
                     String text = "Drop an archive file or a folder here";
@@ -353,17 +373,17 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
 
                 frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-                BufferedImage i1 = getImage(index);
-                BufferedImage i2 = null;
+                imageR = getImage(index);
+                imageL = null;
                 if (index + 1 < images.size() - 1) {
-                    i2 = getImage(index + 1);
+                    imageL = getImage(index + 1);
                 }
 
-                if (i1 != null) {
-                    drawPage(g, i1, true);
+                if (imageR != null) {
+                    drawPage(g, imageR, true);
                 }
-                if (i2 != null) {
-                    drawPage(g, i2, false);
+                if (imageL != null) {
+                    drawPage(g, imageL, false);
                 }
 
                 frame.setCursor(Cursor.getDefaultCursor());
