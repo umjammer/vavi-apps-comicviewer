@@ -10,6 +10,7 @@
 the comic viewer avif supported.<br/>
 this is a stopgap until Ventura (support avif natively) release.
 
+ * magnify ... click w/ the command key and drag
 ## TODO
 
  * ~~resizing when the window is larger than an image~~

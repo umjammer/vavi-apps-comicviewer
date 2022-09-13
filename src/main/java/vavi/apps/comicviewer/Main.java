@@ -7,7 +7,6 @@
 package vavi.apps.comicviewer;
 
 import java.awt.BasicStroke;
-import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -26,10 +25,13 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.font.FontRenderContext;
 import java.awt.font.TextAttribute;
 import java.awt.font.TextLayout;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -251,6 +253,45 @@ Debug.println(e.getMessage());
             }
         });
 
+        float magnitude = 10;
+        JPanel magnify = new JPanel() {
+            public void paintComponent(Graphics g) {
+                super.paintComponent(g);
+
+                int x = getX() + getWidth() / 2;
+                int y = getY() + getHeight() / 2;
+                int w = (int) (getWidth() / magnitude);
+                int h = (int) (getHeight() / magnitude);
+//Debug.printf("magnify: %d, %d %d, %d", x, y, w, h);
+                BufferedImage image = null;
+                Rectangle r = null;
+                float s = 0;
+                if (rectL.contains(x, y)) {
+                    image = imageL;
+                    r = rectL;
+                    s = scaleL;
+                } else if (rectR.contains(x, y)) {
+                    image = imageR;
+                    r = rectR;
+                    s = scaleR;
+                };
+                if (image != null) {
+                    int iw = (int) (w / s);
+                    int ih = (int) (h / s);
+                    int ix = (int) ((x - r.x - iw / 2) / s);
+                    int iy = (int) ((y - r.y - ih / 2) / s);
+//Debug.printf("sub: %d, %d %d, %d", ix, iy, iw, ih);
+                    // TODO cropping out of bounds
+                    BufferedImage sub = image.getSubimage(ix, iy, iw, ih);
+                    g.setClip(new Ellipse2D.Float(0, 0, getWidth(), getHeight()));
+                    g.drawImage(sub, 0, 0, getWidth(), getHeight(), 0, 0, iw, ih, null);
+                }
+            }
+        };
+        magnify.setSize(new Dimension(450, 450));
+        magnify.setOpaque(false);
+        magnify.setVisible(false);
+
         panel = new JPanel() {
             {
                 // this is the DnD target sample for a file name from external applications
@@ -389,9 +430,38 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
                 frame.setCursor(Cursor.getDefaultCursor());
             }
         };
+        panel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (e.isMetaDown()) {
+                    // start magnify
+//Debug.printf("mousePressed: %d, %d", e.getX(), e.getY());
+                    magnify.setLocation(e.getX() - magnify.getWidth() / 2, e.getY() - magnify.getHeight() / 2);
+                    magnify.setVisible(true);
+                    magnify.repaint();
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                // end magnify
+//Debug.printf("mouseReleased: %d, %d", e.getX(), e.getY());
+                magnify.setVisible(false);
+                magnify.repaint();
+            }
+        });
+        panel.addMouseMotionListener(new MouseAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+//Debug.printf("mouseDragged: %d, %d", e.getX(), e.getY());
+                magnify.setLocation(e.getX() - magnify.getWidth() / 2, e.getY() - magnify.getHeight() / 2);
+                magnify.repaint();
+            }
+        });
         panel.setBackground(Color.black);
         panel.setPreferredSize(new Dimension(w, h));
-        panel.setLayout(new BorderLayout());
+        panel.setLayout(null);
+        panel.add(magnify);
 
         frame.setLocation(x, y);
         frame.setContentPane(panel);
