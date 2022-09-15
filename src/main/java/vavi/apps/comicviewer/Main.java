@@ -16,11 +16,6 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Shape;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.dnd.DnDConstants;
-import java.awt.dnd.DropTarget;
-import java.awt.dnd.DropTargetDragEvent;
-import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
@@ -61,7 +56,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
 import com.apple.eawt.Application;
-import vavi.awt.dnd.BasicDTListener;
+import vavi.awt.dnd.Droppable;
 import vavi.util.Debug;
 
 
@@ -345,57 +340,30 @@ Debug.println("index: " + index);
 
         panel = new JPanel() {
             {
-                // this is the DnD target sample for a file name from external applications
-                new DropTarget(
-                        this,
-                        DnDConstants.ACTION_COPY_OR_MOVE,
-                        new BasicDTListener() {
-
-                            @Override
-                            protected boolean isDragFlavorSupported(DropTargetDragEvent ev) {
-                                return ev.isDataFlavorSupported(DataFlavor.javaFileListFlavor);
-                            }
-
-                            @Override
-                            protected DataFlavor chooseDropFlavor(DropTargetDropEvent ev) {
-                                if (ev.isLocalTransfer() && ev.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-                                    return DataFlavor.javaFileListFlavor;
-                                }
-                                DataFlavor chosen = null;
-                                if (ev.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-                                    chosen = DataFlavor.javaFileListFlavor;
-                                }
-                                return chosen;
-                            }
-
-                            @SuppressWarnings("unchecked")
-                            @Override
-                            protected boolean dropImpl(DropTargetDropEvent ev, Object data) {
-                                try {
-                                    System.setProperty("vavi.util.archive.zip.encoding", "utf-8");
-                                    init(Paths.get(((List<File>) data).get(0).getPath()), 0);
-                                    return true;
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                    return false;
-                                } catch (IllegalArgumentException e) {
-                                    if (e.getMessage().equals("MALFORMED")) {
+                Droppable.makeComponentSinglePathDroppable(this, path -> {
+                    try {
+System.setProperty("vavi.util.archive.zip.encoding", "utf-8");
+                        init(path, 0);
+                        return true;
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        return false;
+                    } catch (IllegalArgumentException e) {
+                        if (e.getMessage().equals("MALFORMED")) {
 Debug.println("zip reading failure by utf-8, retry using ms932");
-                                        try {
-                                            System.setProperty("vavi.util.archive.zip.encoding", "ms932");
-                                            init(Paths.get(((List<File>) data).get(0).getPath()), 0);
-                                            return true;
-                                        } catch (IOException f) {
-                                            f.printStackTrace();
-                                        }
-                                    } else {
-                                        e.printStackTrace();
-                                    }
-                                    return false;
-                                }
+                            try {
+System.setProperty("vavi.util.archive.zip.encoding", "ms932");
+                                init(path, 0);
+                                return true;
+                            } catch (IOException f) {
+                                f.printStackTrace();
                             }
-                        },
-                        true);
+                        } else {
+                            e.printStackTrace();
+                        }
+                        return false;
+                    }
+                });
             }
             void drawText(Graphics g, String text, String fontName, int point, int ratio) {
                 Font font = new Font(fontName, Font.PLAIN, point);
@@ -464,6 +432,11 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
                 }
 
                 frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+
+                Graphics2D g2d = (Graphics2D) g;
+                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
                 imageR = getImage(index);
                 imageL = null;

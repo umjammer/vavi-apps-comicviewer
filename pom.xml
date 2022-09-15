@@ -68,8 +68,9 @@
 
               <mainClass>vavi.apps.comicviewer.Main</mainClass>
               <runnableJar>${project.artifactId}-${project.version}.jar</runnableJar>
-              <bundleJre>false</bundleJre>
               <generateInstaller>false</generateInstaller>
+              <bundleJre>true</bundleJre>
+              <jrePath>${java.home}</jrePath>
 
               <assetsDir>${javapackager.assetsDir}</assetsDir>
 
@@ -81,9 +82,6 @@
                 <vmArg>-Djna.library.path=/usr/local/lib</vmArg>
                 <vmArg>-Dapple.laf.useScreenMenuBar=true</vmArg>
               </vmArgs>
-
-              <bundleJre>true</bundleJre>
-              <jrePath>${java.home}</jrePath>
 
               <macConfig>
                 <!-- true cause error -->
@@ -177,9 +175,9 @@
       <version>0.0.2</version>
     </dependency>
     <dependency>
-      <groupId>com.github.umjammer</groupId>
+      <groupId>vavi</groupId>
       <artifactId>vavi-awt</artifactId>
-      <version>1.0.5</version>
+      <version>1.0.6-SNAPSHOT</version>
     </dependency>
 
     <dependency>

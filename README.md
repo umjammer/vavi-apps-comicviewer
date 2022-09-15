@@ -29,3 +29,4 @@ this is a stopgap until Ventura (support avif natively) release.
      * info.plist? -> right, use `CFBundleTypeExtensions` for accepting to drop
      * `CFProcessPath`? -> env
      * info.plist `:Javax:JVMVersion` doesn't work
+   * recent opened files menu 
