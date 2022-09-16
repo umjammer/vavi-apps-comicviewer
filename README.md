@@ -12,10 +12,25 @@ this is a stopgap until Ventura (support avif natively) release.
 
 ## Usage
 
- * open ... drop an archive or a folder into the application window
- * next ... ^N, click the left page, left arrow (with shift key ... shift 1 page next)
- * prev ... ^P, click the right page, right arrow (with shift key ... shift 1 page prev)
- * magnify ... click w/ the command key and drag
+ * open ...
+   * drop an archive or a folder into the application window
+   * via open menus
+ * next ... (with shift key ... shift 1 page next)
+   * ^N
+   * click the left page
+   * left arrow
+ * prev ... (with shift key ... shift 1 page prev)
+   * ^P
+   * click the right page
+   * right arrow
+ * magnify ...
+   * click w/ the command key and drag
+
+## Remarkable Points
+
+ * drop and open via dock icon
+ * resizing smaller/larger keeping aspect ratio
+ * avif
 
 ## TODO
 
@@ -30,4 +45,6 @@ this is a stopgap until Ventura (support avif natively) release.
    * `CFProcessPath`? -> env
    * info.plist `:Javax:JVMVersion` doesn't work -> bundle jdk
  * ~~recent opened files menu~~
+   * wip: not work on .app
  * ~~sibling files menu~~
+   * wip: not work on .app
