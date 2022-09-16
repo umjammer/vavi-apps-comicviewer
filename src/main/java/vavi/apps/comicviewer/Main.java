@@ -13,7 +13,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Rectangle;
+import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.event.ComponentAdapter;
@@ -44,19 +44,28 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JLayeredPane;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.SwingConstants;
 
 import com.apple.eawt.Application;
 import vavi.awt.dnd.Droppable;
+import vavi.swing.JImageComponent;
 import vavi.util.Debug;
 
 
@@ -79,8 +88,8 @@ Debug.println("shutdownHook");
             app.prefs.putInt("lastIndex", app.index);
             app.prefs.putInt("lastX", app.frame.getX());
             app.prefs.putInt("lastY", app.frame.getY());
-            app.prefs.putInt("lastWidth", Math.max(app.panel.getWidth(), 160));
-            app.prefs.putInt("lastHeight", Math.max(app.panel.getHeight(), 120));
+            app.prefs.putInt("lastWidth", Math.max(app.base.getWidth(), 160));
+            app.prefs.putInt("lastHeight", Math.max(app.base.getHeight(), 120));
             app.prefs.put("lastPath", String.valueOf(app.path));
         }));
         // create and display a simple jframe
@@ -101,11 +110,7 @@ Debug.println("shutdownHook");
                     application.setOpenFileHandler(openFilesEvent -> {
                         List<File> files = openFilesEvent.getFiles();
 Debug.println(Level.FINE, "files: " + files.size() + ", " + (files.size() > 0 ? files.get(0) : ""));
-                        try {
-                            app.init(Paths.get(files.get(0).getPath()), 0);
-                        } catch (IOException e) {
-                            Debug.println(e);
-                        }
+                        app.init(Paths.get(files.get(0).getPath()), 0);
                     });
                 } catch (Throwable ex) {
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -148,64 +153,119 @@ Debug.println(Level.FINE, "path: " + path.getFileName() + (Files.isDirectory(pat
         return !Files.isDirectory(path) && Arrays.asList(imageExts).contains(getExt(path));
     }
 
-    void init(Path path, int index) throws IOException {
-        this.path = path;
-        this.index = index;
-
+    void clean() {
         images.clear();
         cache.clear();
         if (es != null && !es.isTerminated()) {
             es.shutdownNow();
             while (!es.isTerminated()) Thread.yield();
         }
+    }
 
-        Path virtualRoot;
-        if (!isArchive(path)) {
-            virtualRoot = path;
-        } else {
-            URI uri = URI.create("archive:" + path.toUri());
-Debug.println("open fs: " + uri);
-            if (fs != null) {
-                fs.close();
+    void addMenuItemTo(JMenu menu, Path p) {
+        try {
+            if (!Files.isSameFile(p, path)) {
+                JMenuItem mi = new JMenuItem(p.getFileName().toString());
+                mi.addActionListener(e -> {
+                    init(p, 0);
+                });
+                menu.add(mi);
+Debug.println("add menuItem: " + mi.getText());
             }
-            fs = FileSystems.newFileSystem(uri, Collections.emptyMap());
-            virtualRoot = fs.getRootDirectories().iterator().next();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-Debug.println(virtualRoot);
-        Files.walk(virtualRoot)
-                .filter(Main::isImage)
-                .sorted()
-                .forEach(images::add);
-Debug.println("images: " + images.size());
-        frame.setTitle("zzzViewer - " + path.getFileName());
-        panel.repaint();
+    }
 
-        es = Executors.newSingleThreadExecutor();
-        es.submit(() -> {
-            // don't disturb before first 2 pages are shown
-            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
-            for (int i = index + 2; i < images.size(); i++) {
-                getImage(i);
-                // create gap for paging
-                Thread.yield();
+    static void clearMenuItems(JMenu menu) {
+        List<JMenuItem> mis = new ArrayList<>();
+        for (int i = 0; i < menu.getItemCount(); i++) {
+            mis.add(menu.getItem(i));
+        }
+        for (JMenuItem mi : mis) {
+Debug.println("remove menuItem: " + mi);
+            menu.remove(mi);
+        }
+Debug.println("remove menuItem: " + menu.getItemCount());
+    }
+
+    void updateOpenRecentMenu() {
+        recent.add(path);
+        if (recent.size() > RECENT) {
+            recent.remove(0);
+        }
+        clearMenuItems(openRecentMenu);
+        recent.forEach(p -> addMenuItemTo(openRecentMenu, p));
+    }
+
+    void init(Path path, int index) {
+        try {
+            this.path = path;
+            this.index = index;
+
+            clean();
+
+            Path virtualRoot;
+            if (!isArchive(path)) {
+                virtualRoot = path;
+            } else {
+                URI uri = URI.create("archive:" + path.toUri());
+Debug.println("open fs: " + uri);
+                if (fs != null) {
+                    fs.close();
+                }
+                fs = FileSystems.newFileSystem(uri, Collections.emptyMap());
+                virtualRoot = fs.getRootDirectories().iterator().next();
             }
-            for (int i = 0; i < index; i++) {
-                getImage(i);
-                // create gap for paging
-                Thread.yield();
-            }
+Debug.println(virtualRoot);
+            Files.walk(virtualRoot)
+                    .filter(Main::isImage)
+                    .sorted()
+                    .forEach(images::add);
+Debug.println("images: " + images.size());
+
+            frame.setTitle("zzzViewer - " + path.getFileName());
+            updateModel();
+            clearMenuItems(openSiblingMenu);
+            Files.list(path.getParent())
+                    .filter(Main::isArchive)
+                    .sorted()
+                    .forEach(p -> addMenuItemTo(openSiblingMenu, p));
+            clearMenuItems(openRecentMenu);
+            updateOpenRecentMenu();
+
+            es = Executors.newSingleThreadExecutor();
+            es.submit(() -> {
+                // don't disturb before first 2 pages are shown
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ignored) {
+                }
+                for (int i = index + 2; i < images.size(); i++) {
+                    getImage(i);
+                    // create gap for paging
+                    Thread.yield();
+                }
+                for (int i = 0; i < index; i++) {
+                    getImage(i);
+                    // create gap for paging
+                    Thread.yield();
+                }
 Debug.println("CACHE: done");
-            es.shutdown();
-            if (fs != null) {
-               try {
-                   fs.close();
+                es.shutdown();
+                if (fs != null) {
+                    try {
+                        fs.close();
 Debug.println("close fs");
-               } catch (IOException e) {
-Debug.println(e);
-               }
-               fs = null;
-           }
-        });
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    fs = null;
+                }
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     BufferedImage getImage(int i) {
@@ -232,15 +292,19 @@ Debug.println(e.getMessage());
     // view-model
     List<Path> images = new ArrayList<>();
     final Map<Integer, BufferedImage> cache = new HashMap<>();
-    BufferedImage imageR;
-    BufferedImage imageL;
-    Rectangle rectR = new Rectangle();
-    Rectangle rectL = new Rectangle();
-    float scaleL, scaleR;
+    static final int RECENT = 10;
+    List<Path> recent = new ArrayList<>(RECENT);
+    JImageComponent imageR;
+    JImageComponent imageL;
+    JMenu openRecentMenu;
+    JMenu openSiblingMenu;
 
     // view
     JFrame frame;
+    JLayeredPane base;
     JPanel panel;
+    JPanel glass;
+    Map<Object, Object> hints;
 
     // model
     Path path;
@@ -249,12 +313,47 @@ Debug.println(e.getMessage());
     void nextPage(int d) {
         if (index + d < images.size() - 1) {
             index += d;
+            updateModel();
         }
     }
 
     void prevPage(int d) {
         if (index >= d) {
             index -= d;
+            updateModel();
+        }
+    }
+
+    void updateView() {
+        frame.repaint();
+//Debug.println("glass: " + glass.getBounds());
+//Debug.println("base: " + base.getBounds());
+    }
+
+    void updateModel() {
+        frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+
+Debug.println("index: " + index);
+        imageR.setImage(index < images.size() ? getImage(index) : null);
+        imageL.setImage(index + 1 < images.size() ? getImage(index + 1) : null);
+
+        frame.setCursor(Cursor.getDefaultCursor());
+
+        updateView();
+    }
+
+    void open() {
+        JFileChooser ofd = new JFileChooser();
+        ofd.setDialogTitle("Open");
+
+        Path dir = Paths.get(prefs.get("lastDir", path != null ? path.getParent().toString() : System.getProperty("user.dir")));
+        if (Files.exists(dir)) {
+            ofd.setCurrentDirectory(dir.toFile());
+        }
+
+        if (ofd.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+            init(Paths.get(ofd.getSelectedFile().getPath()), 0);
+            prefs.get("lastDir", ofd.getCurrentDirectory().getPath());
         }
     }
 
@@ -269,7 +368,7 @@ Debug.println(e.getMessage());
             @Override
             public void keyPressed(KeyEvent e) {
                 int d = e.isShiftDown() ? 1 : 2;
-Debug.println("move: " + d);
+//Debug.println("move: " + d);
                 switch (e.getKeyCode()) {
                 case KeyEvent.VK_LEFT:
                     nextPage(d);
@@ -288,76 +387,84 @@ Debug.println("move: " + d);
                     }
                     break;
                 }
-                panel.repaint();
-Debug.println("index: " + index);
             }
         });
         frame.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
-                panel.repaint();
+                glass.setSize(base.getSize());
+                panel.setSize(base.getSize());
+                updateView();
             }
         });
+
+        JMenuItem openMenu = new JMenuItem("Open...");
+        openMenu.addActionListener(e -> { open(); });
+        openRecentMenu = new JMenu("Open Recent");
+        openSiblingMenu = new JMenu("Open Sibling");
+        JMenuItem closeMenu = new JMenuItem("Close");
+        closeMenu.addActionListener(e -> { clean(); updateModel(); });
+        JMenu fileMenu = new JMenu("File");
+        fileMenu.add(openMenu);
+        fileMenu.add(openRecentMenu);
+        fileMenu.add(openSiblingMenu);
+        fileMenu.add(closeMenu);
+        JMenuBar menuBar = new JMenuBar();
+        menuBar.add(fileMenu);
+
+        frame.setJMenuBar(menuBar);
 
         float magnitude = 10;
         JPanel magnify = new JPanel() {
             public void paintComponent(Graphics g) {
                 super.paintComponent(g);
 
-                int x = getX() + getWidth() / 2;
-                int y = getY() + getHeight() / 2;
-                int w = (int) (getWidth() / magnitude);
-                int h = (int) (getHeight() / magnitude);
-//Debug.printf("magnify: %d, %d %d, %d", x, y, w, h);
-                BufferedImage image = null;
-                Rectangle r = null;
-                float s = 0;
-                if (rectL.contains(x, y)) {
-                    image = imageL;
-                    r = rectL;
-                    s = scaleL;
-                } else if (rectR.contains(x, y)) {
-                    image = imageR;
-                    r = rectR;
-                    s = scaleR;
-                };
-                if (image != null) {
-                    int iw = (int) (w / s);
-                    int ih = (int) (h / s);
-                    int ix = (int) ((x - r.x - iw / 2) / s);
-                    int iy = (int) ((y - r.y - ih / 2) / s);
-//Debug.printf("sub: %d, %d %d, %d", ix, iy, iw, ih);
-                    // TODO cropping out of bounds
-                    BufferedImage sub = image.getSubimage(ix, iy, iw, ih);
-                    g.setClip(new Ellipse2D.Float(0, 0, getWidth(), getHeight()));
-                    g.drawImage(sub, 0, 0, getWidth(), getHeight(), 0, 0, iw, ih, null);
+                int w = Math.round(getWidth() / magnitude);
+                int h = Math.round(getHeight() / magnitude);
+                int x = getX() + Math.round((getWidth() - w) / 2f);
+                int y = getY() + Math.round((getHeight() - h) / 2f);
+Debug.printf(Level.FINE, "magnify: %d, %d %d, %d", x, y, w, h);
+                int mx = getX() + Math.round(getWidth() / 2f);
+                int my = getY() + Math.round(getHeight() / 2f);
+                JImageComponent comp = null;
+                int dx = 0;
+                if (imageL.getBounds().contains(mx, my)) {
+Debug.printf(Level.FINE, "mag left: " + imageL.getBounds());
+                    comp = imageL;
+                } else if (imageR.getBounds().contains(mx, my)) {
+Debug.printf(Level.FINE, "mag right: " + imageR.getBounds());
+                    comp = imageR;
+                    dx = Math.round(panel.getWidth() / 2f);
                 }
+                if (comp != null) {
+//                    ((Graphics2D) g).setRenderingHints(hints);
+Debug.printf(Level.FINE, "mag area: %d, %d %d, %d", x - dx, y, w, h);
+                    BufferedImage sub = comp.getSubimage(x - dx, y, w, h);
+                    g.setClip(new Ellipse2D.Float(0, 0, getWidth(), getHeight()));
+                    g.drawImage(sub, 0, 0, getWidth(), getHeight(), null);
+                }
+//g.setColor(Color.green);
+//Debug.printf("green: %d, %d %d, %d", x - getX(), y - getY(), w, h);
+//g.drawRect(x - getX(), y - getY(), w, h);
             }
         };
         magnify.setSize(new Dimension(450, 450));
         magnify.setOpaque(false);
         magnify.setVisible(false);
 
-        panel = new JPanel() {
+        glass = new JPanel() {
             {
                 Droppable.makeComponentSinglePathDroppable(this, path -> {
                     try {
 System.setProperty("vavi.util.archive.zip.encoding", "utf-8");
                         init(path, 0);
                         return true;
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        return false;
                     } catch (IllegalArgumentException e) {
                         if (e.getMessage().equals("MALFORMED")) {
 Debug.println("zip reading failure by utf-8, retry using ms932");
-                            try {
 System.setProperty("vavi.util.archive.zip.encoding", "ms932");
-                                init(path, 0);
-                                return true;
-                            } catch (IOException f) {
-                                f.printStackTrace();
-                            }
+                            init(path, 0);
+                            return true;
                         } else {
                             e.printStackTrace();
                         }
@@ -365,7 +472,7 @@ System.setProperty("vavi.util.archive.zip.encoding", "ms932");
                     }
                 });
             }
-            void drawText(Graphics g, String text, String fontName, int point, int ratio) {
+            void drawText(Graphics g, String text, String fontName, int point, int ratio, Color strokeColor, Color fillColor) {
                 Font font = new Font(fontName, Font.PLAIN, point);
 
                 float stroke = point / (float) ratio;
@@ -383,78 +490,22 @@ System.setProperty("vavi.util.archive.zip.encoding", "ms932");
                 float sw = (float) tl.getBounds().getWidth();
                 float sh = (float) tl.getBounds().getHeight();
                 Shape shape = tl.getOutline(AffineTransform.getTranslateInstance((getWidth() - sw) / 2, (getHeight() - sh) / 2));
-                graphics.setColor(Color.black);
+                graphics.setColor(strokeColor);
                 graphics.setStroke(new BasicStroke(stroke));
                 graphics.draw(shape);
-                graphics.setColor(Color.white);
+                graphics.setColor(fillColor);
                 graphics.fill(shape);
-            }
-            // https://stackoverflow.com/a/10245583
-            void drawPage(Graphics g, BufferedImage image, boolean right) {
-                int w = getWidth() / 2;
-                int h = getHeight();
-                int iw = image.getWidth();
-                int ih = image.getHeight();
-                float sw = 1;
-                float sh = 1;
-                float s;
-                if (iw > w || ih > h) {
-                    if (iw > w) {
-                        sw = w / (float) iw;
-                    }
-                    if (ih * sw > h) {
-                        sh = h / (float) ih;
-                    }
-                    s = Math.min(sw, sh);
-                } else {
-                    if (w > iw) {
-                        sw = (float) iw / w;
-                    }
-                    if (ih * sw < h) {
-                        sh = (float) ih / h;
-                    }
-                    s = 1 / Math.max(sw, sh);
-                }
-                int nw = (int) (iw * s);
-                int nh = (int) (ih * s);
-                g.drawImage(image, right ? w : w - nw, (h - nh) / 2, nw, nh, null);
-                Rectangle r = right ? rectR : rectL;
-                r.setBounds(right ? w : w - nw, (h - nh) / 2, nw, nh);
-                if (right) scaleR = s; else scaleL = s;
             }
             public void paintComponent(Graphics g) {
                 super.paintComponent(g);
 
                 if (images.size() == 0) {
                     String text = "Drop an archive file or a folder here";
-                    drawText(g, text, "San Serif", 20, 12);
-                    return;
+                    drawText(g, text, "San Serif", 20, 12, Color.pink, Color.white);
                 }
-
-                frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-
-                Graphics2D g2d = (Graphics2D) g;
-                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                imageR = getImage(index);
-                imageL = null;
-                if (index + 1 < images.size() - 1) {
-                    imageL = getImage(index + 1);
-                }
-
-                if (imageR != null) {
-                    drawPage(g, imageR, true);
-                }
-                if (imageL != null) {
-                    drawPage(g, imageL, false);
-                }
-
-                frame.setCursor(Cursor.getDefaultCursor());
             }
         };
-        panel.addMouseListener(new MouseAdapter() {
+        glass.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
                 if (e.isMetaDown()) {
@@ -476,16 +527,17 @@ System.setProperty("vavi.util.archive.zip.encoding", "ms932");
 
             @Override
             public void mouseClicked(MouseEvent e) {
-                int d = e.isShiftDown() ? 1 : 2;
-                if (rectL.contains(e.getX(), e.getY())) {
-                    nextPage(d);
-                } else if (rectR.contains(e.getX(), e.getY())) {
-                    prevPage(d);
-                };
-                panel.repaint();
+                if (!e.isMetaDown()) {
+                    int d = e.isShiftDown() ? 1 : 2;
+                    if (imageL.getBounds().contains(e.getX(), e.getY())) {
+                        nextPage(d);
+                    } else if (imageR.getBounds().contains(e.getX(), e.getY())) {
+                        prevPage(d);
+                    }
+                }
             }
         });
-        panel.addMouseMotionListener(new MouseAdapter() {
+        glass.addMouseMotionListener(new MouseAdapter() {
             @Override
             public void mouseDragged(MouseEvent e) {
 //Debug.printf("mouseDragged: %d, %d", e.getX(), e.getY());
@@ -493,13 +545,37 @@ System.setProperty("vavi.util.archive.zip.encoding", "ms932");
                 magnify.repaint();
             }
         });
+        glass.setOpaque(false);
+        glass.setLayout(null);
+        glass.add(magnify);
+
+        panel = new JPanel();
         panel.setBackground(Color.black);
-        panel.setPreferredSize(new Dimension(w, h));
-        panel.setLayout(null);
-        panel.add(magnify);
+        panel.setLayout(new GridLayout(1, 2));
+
+        hints = new HashMap<>();
+        hints.put(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        hints.put(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        hints.put(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        imageL = new JImageComponent();
+        imageL.setRenderingHints(hints);
+        imageL.setImageHorizontalAlignment(SwingConstants.RIGHT);
+        imageL.setImageVerticalAlignment(SwingConstants.CENTER);
+        imageR = new JImageComponent();
+        imageR.setRenderingHints(hints);
+        imageR.setImageVerticalAlignment(SwingConstants.CENTER);
+
+        panel.add(imageL);
+        panel.add(imageR);
+
+        base = new JLayeredPane();
+        base.setPreferredSize(new Dimension(w, h));
+        base.add(glass);
+        base.add(panel);
 
         frame.setLocation(x, y);
-        frame.setContentPane(panel);
+        frame.setContentPane(base);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.pack();
         frame.setVisible(true);

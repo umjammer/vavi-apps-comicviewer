@@ -47,15 +47,16 @@ class Test1 {
 
     @BeforeEach
     void setup() throws IOException {
-        Test1 app = new Test1();
-        PropsEntity.Util.bind(app);
+        PropsEntity.Util.bind(this);
+Debug.println("dir: " + dir);
+Debug.println("file: " + file);
     }
 
     @Test
     void test1() throws Exception {
         Path path = Paths.get(dir, file);
         URI uri = URI.create("archive:" + path.toUri());
-        Debug.println("open fs: " + uri);
+Debug.println("open fs: " + uri);
         FileSystem fs = FileSystems.newFileSystem(uri, Collections.emptyMap());
         Path virtualRoot = fs.getRootDirectories().iterator().next();
 Debug.println(virtualRoot);

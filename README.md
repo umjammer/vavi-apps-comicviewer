@@ -25,8 +25,9 @@ this is a stopgap until Ventura (support avif natively) release.
      * ~~`-Dapple.awt.application.name=Foo` doesn't work~~
      * use `macConfig.infoPlist.additionalEntries` key:`CFBundleName`
    * `macConfig.icnsFile` doesn't work?
-   * drop into mac application
-     * info.plist? -> right, use `CFBundleTypeExtensions` for accepting to drop
-     * `CFProcessPath`? -> env
-     * info.plist `:Javax:JVMVersion` doesn't work
-   * recent opened files menu 
+ * drop into mac application
+   * info.plist? -> right, use `CFBundleTypeExtensions` for accepting to drop
+   * `CFProcessPath`? -> env
+   * info.plist `:Javax:JVMVersion` doesn't work -> bundle jdk
+ * ~~recent opened files menu~~
+ * ~~sibling files menu~~
