@@ -25,13 +25,12 @@ import javax.swing.JOptionPane;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 import vavi.util.Debug;
 import vavi.util.properties.annotation.Property;
 import vavi.util.properties.annotation.PropsEntity;
 
 
-@EnabledIf("localPropertiesExists")
+//@EnabledIf("localPropertiesExists")
 @PropsEntity(url = "file:local.properties")
 class Test1 {
 
@@ -40,16 +39,18 @@ class Test1 {
     }
 
     @Property(name = "test1.dir")
-    String dir;
+    String dir = "src/test/resources";
 
     @Property(name = "test1.file")
-    String file;
+    String file = "avif.zip";
 
     @BeforeEach
     void setup() throws IOException {
-        PropsEntity.Util.bind(this);
+        if (localPropertiesExists()) {
+            PropsEntity.Util.bind(this);
 Debug.println("dir: " + dir);
 Debug.println("file: " + file);
+        }
     }
 
     @Test
