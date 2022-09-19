@@ -77,12 +77,14 @@
               <assetsDir>${javapackager.assetsDir}</assetsDir>
 
               <additionalResources>
+                <additionalResource>${project.build.outputDirectory}/logging.properties</additionalResource>
                 <additionalResource>${project.build.testOutputDirectory}/librococoa.dylib</additionalResource>
               </additionalResources>
 
               <vmArgs>
                 <vmArg>-Djna.library.path=/usr/local/lib</vmArg>
                 <vmArg>-Dapple.laf.useScreenMenuBar=true</vmArg>
+                <vmArg>-Djava.util.logging.config.file=./logging.properties</vmArg>
               </vmArgs>
 
               <macConfig>
@@ -180,6 +182,11 @@
       <groupId>vavi</groupId>
       <artifactId>vavi-awt</artifactId>
       <version>1.0.6-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.umjammer</groupId>
+      <artifactId>vavi-util-logging-asl</artifactId>
+      <version>0.0.1</version>
     </dependency>
 
     <dependency>
