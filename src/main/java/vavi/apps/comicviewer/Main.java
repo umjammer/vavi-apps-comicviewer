@@ -8,20 +8,24 @@ package vavi.apps.comicviewer;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
-import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.awt.font.FontRenderContext;
 import java.awt.font.TextAttribute;
 import java.awt.font.TextLayout;
@@ -44,29 +48,42 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
+import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JSlider;
+import javax.swing.JWindow;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 import com.apple.eawt.Application;
 import vavi.awt.dnd.Droppable;
 import vavi.swing.JImageComponent;
 import vavi.util.Debug;
+import vavi.util.archive.Archives;
+import vavi.util.archive.zip.ZipArchive;
+
+import static javax.swing.SwingConstants.CENTER;
 
 
 /**
@@ -91,6 +108,15 @@ Debug.println("shutdownHook");
             app.prefs.putInt("lastWidth", Math.max(app.base.getWidth(), 160));
             app.prefs.putInt("lastHeight", Math.max(app.base.getHeight(), 120));
             app.prefs.put("lastPath", String.valueOf(app.path));
+            if (app.fs != null) {
+                try {
+                    app.fs.close();
+                    Debug.println("close fs");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                app.fs = null;
+            }
         }));
         // create and display a simple jframe
         app.gui();
@@ -109,7 +135,8 @@ Debug.println("shutdownHook");
                     // TODO OpenFileHandler is <= 1.8
                     application.setOpenFileHandler(openFilesEvent -> {
                         List<File> files = openFilesEvent.getFiles();
-Debug.println(Level.FINE, "files: " + files.size() + ", " + (files.size() > 0 ? files.get(0) : ""));
+                        // TODO file name is weired
+                        Debug.println(Level.FINE, "files: " + files.size() + ", " + (files.size() > 0 ? files.get(0) : ""));
                         app.init(Paths.get(files.get(0).getPath()), 0);
                     });
                 } catch (Throwable ex) {
@@ -118,7 +145,7 @@ Debug.println(Level.FINE, "files: " + files.size() + ", " + (files.size() > 0 ? 
                     ex.printStackTrace(pr);
                     pr.flush();
                     pr.close();
-JOptionPane.showMessageDialog(null, baos.toString(), ex.getMessage(), JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(null, baos.toString(), ex.getMessage(), JOptionPane.ERROR_MESSAGE);
                 }
             }
 
@@ -126,7 +153,7 @@ JOptionPane.showMessageDialog(null, baos.toString(), ex.getMessage(), JOptionPan
                 String p = app.prefs.get("lastPath", null);
                 if (p != null) {
                     Path path = Paths.get(p);
-                    if (Files.exists(path)){
+                    if (Files.exists(path)) {
                         int index = app.prefs.getInt("lastIndex", 0);
                         app.init(path, index);
                     }
@@ -135,7 +162,16 @@ JOptionPane.showMessageDialog(null, baos.toString(), ex.getMessage(), JOptionPan
         }
     }
 
-    static final String[] archiveExts = {"zip", "cbz", "rar", "lha", "cab", "7z", "arj"};
+    static final String[] imageExts;
+
+    static final String[] archiveExts;
+
+    static {
+        imageExts = ImageIO.getReaderFileSuffixes();
+Debug.println("available images: " + Arrays.toString(imageExts));
+        archiveExts = Archives.getReaderFileSuffixes();
+Debug.println("available archives: " + Arrays.toString(archiveExts));
+    }
 
     static String getExt(Path path) {
         String filename = path.getFileName().toString();
@@ -145,8 +181,6 @@ JOptionPane.showMessageDialog(null, baos.toString(), ex.getMessage(), JOptionPan
     static boolean isArchive(Path path) {
         return !Files.isDirectory(path) && Arrays.asList(archiveExts).contains(getExt(path));
     }
-
-    static final String[] imageExts = {"avif", "jpg", "jpeg", "png", ""};
 
     static boolean isImage(Path path) {
 Debug.println(Level.FINE, "path: " + path.getFileName() + (Files.isDirectory(path) ? "" : ", " + getExt(path)));
@@ -198,6 +232,12 @@ Debug.println("remove menuItem: " + menu.getItemCount());
         recent.forEach(p -> addMenuItemTo(openRecentMenu, p));
     }
 
+    private Thread minThreadFactory(Runnable r) {
+        Thread thread = new Thread(r);
+        thread.setPriority(Thread.MIN_PRIORITY);
+        return thread;
+    }
+
     void init(Path path, int index) {
         try {
             this.path = path;
@@ -234,7 +274,7 @@ Debug.println("images: " + images.size());
             clearMenuItems(openRecentMenu);
             updateOpenRecentMenu();
 
-            es = Executors.newSingleThreadExecutor();
+            es = Executors.newSingleThreadExecutor(this::minThreadFactory);
             es.submit(() -> {
                 // don't disturb before first 2 pages are shown
                 try {
@@ -253,15 +293,6 @@ Debug.println("images: " + images.size());
                 }
 Debug.println("CACHE: done");
                 es.shutdown();
-                if (fs != null) {
-                    try {
-                        fs.close();
-Debug.println("close fs");
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    fs = null;
-                }
             });
         } catch (IOException e) {
             e.printStackTrace();
@@ -294,17 +325,18 @@ Debug.println(e.getMessage());
     final Map<Integer, BufferedImage> cache = new HashMap<>();
     static final int RECENT = 10;
     List<Path> recent = new ArrayList<>(RECENT);
+    Map<Object, Object> hints;
     JImageComponent imageR;
     JImageComponent imageL;
     JMenu openRecentMenu;
     JMenu openSiblingMenu;
 
-    // view
+    // view-controller
     JFrame frame;
     JLayeredPane base;
-    JPanel panel;
+    JPanel pages;
     JPanel glass;
-    Map<Object, Object> hints;
+    Jumper jumper;
 
     // model
     Path path;
@@ -357,49 +389,68 @@ Debug.println("index: " + index);
         }
     }
 
+    boolean drop(Path path) {
+        try {
+            System.setProperty(ZipArchive.ZIP_ENCODING, "utf-8");
+            init(path, 0);
+            return true;
+        } catch (IllegalArgumentException e) {
+            if (e.getMessage().equals("MALFORMED")) {
+Debug.println("zip reading failure by utf-8, retry using ms932");
+                System.setProperty(ZipArchive.ZIP_ENCODING, "ms932");
+                init(path, 0);
+                return true;
+            } else {
+                e.printStackTrace();
+            }
+            return false;
+        }
+    }
+
+    static String abbreviate(Path p, int l) {
+        if (p.getFileName().toString().length() < l) {
+            return p.getFileName().toString();
+        }
+        String m = "...";
+        String ext = getExt(p);
+        return p.getFileName().toString().substring(0, l - ext.length() - m.length()) + m + "." + ext;
+    }
+
+    String label() {
+        return String.format("#%d-%d/%d (%s | %s)", index, index + 1, images.size(),
+                index < images.size() ? abbreviate(images.get(index), 17) : "",
+                index + 1 < images.size() ? abbreviate(images.get(index + 1), 17) : "");
+    }
+
     void gui() {
         int x = prefs.getInt("lastX", 0);
         int y = prefs.getInt("lastY", 0);
         int w = prefs.getInt("lastWidth", 1600);
         int h = prefs.getInt("lastHeight", 1200);
 
+        Pager pager = new Pager(this::prevPage, this::nextPage,
+                e -> imageL.getBounds().contains(e.getPoint()),
+                e -> imageR.getBounds().contains(e.getPoint()),
+                i -> {
+                    index = i;
+                    updateModel();
+
+                    jumper.setText(label());
+                });
+
         frame = new JFrame();
-        frame.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                int d = e.isShiftDown() ? 1 : 2;
-//Debug.println("move: " + d);
-                switch (e.getKeyCode()) {
-                case KeyEvent.VK_LEFT:
-                    nextPage(d);
-                    break;
-                case KeyEvent.VK_RIGHT:
-                    prevPage(d);
-                    break;
-                case KeyEvent.VK_N:
-                    if (e.isControlDown()) {
-                        nextPage(d);
-                    }
-                    break;
-                case KeyEvent.VK_P:
-                    if (e.isControlDown()) {
-                        prevPage(d);
-                    }
-                    break;
-                }
-            }
-        });
+        frame.addKeyListener(pager.getPagingAdapter());
         frame.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
                 glass.setSize(base.getSize());
-                panel.setSize(base.getSize());
+                pages.setSize(base.getSize());
                 updateView();
             }
         });
 
         JMenuItem openMenu = new JMenuItem("Open...");
-        openMenu.addActionListener(e -> { open(); });
+        openMenu.addActionListener(e -> open());
         openRecentMenu = new JMenu("Open Recent");
         openSiblingMenu = new JMenu("Open Sibling");
         JMenuItem closeMenu = new JMenuItem("Close");
@@ -414,144 +465,67 @@ Debug.println("index: " + index);
 
         frame.setJMenuBar(menuBar);
 
-        float magnitude = 10;
-        JPanel magnify = new JPanel() {
-            public void paintComponent(Graphics g) {
-                super.paintComponent(g);
-
-                int w = Math.round(getWidth() / magnitude);
-                int h = Math.round(getHeight() / magnitude);
-                int x = getX() + Math.round((getWidth() - w) / 2f);
-                int y = getY() + Math.round((getHeight() - h) / 2f);
-Debug.printf(Level.FINE, "magnify: %d, %d %d, %d", x, y, w, h);
-                int mx = getX() + Math.round(getWidth() / 2f);
-                int my = getY() + Math.round(getHeight() / 2f);
-                JImageComponent comp = null;
-                int dx = 0;
-                if (imageL.getBounds().contains(mx, my)) {
-Debug.printf(Level.FINE, "mag left: " + imageL.getBounds());
-                    comp = imageL;
-                } else if (imageR.getBounds().contains(mx, my)) {
-Debug.printf(Level.FINE, "mag right: " + imageR.getBounds());
-                    comp = imageR;
-                    dx = Math.round(panel.getWidth() / 2f);
-                }
-                if (comp != null) {
-//                    ((Graphics2D) g).setRenderingHints(hints);
-Debug.printf(Level.FINE, "mag area: %d, %d %d, %d", x - dx, y, w, h);
-                    BufferedImage sub = comp.getSubimage(x - dx, y, w, h);
-                    g.setClip(new Ellipse2D.Float(0, 0, getWidth(), getHeight()));
-                    g.drawImage(sub, 0, 0, getWidth(), getHeight(), null);
-                }
-//g.setColor(Color.green);
-//Debug.printf("green: %d, %d %d, %d", x - getX(), y - getY(), w, h);
-//g.drawRect(x - getX(), y - getY(), w, h);
-            }
-        };
-        magnify.setSize(new Dimension(450, 450));
-        magnify.setOpaque(false);
-        magnify.setVisible(false);
-
+        // TODO RootPaneContainer.html#getGlassPane()
         glass = new JPanel() {
             {
-                Droppable.makeComponentSinglePathDroppable(this, path -> {
-                    try {
-System.setProperty("vavi.util.archive.zip.encoding", "utf-8");
-                        init(path, 0);
-                        return true;
-                    } catch (IllegalArgumentException e) {
-                        if (e.getMessage().equals("MALFORMED")) {
-Debug.println("zip reading failure by utf-8, retry using ms932");
-System.setProperty("vavi.util.archive.zip.encoding", "ms932");
-                            init(path, 0);
-                            return true;
-                        } else {
-                            e.printStackTrace();
-                        }
-                        return false;
-                    }
-                });
-            }
-            void drawText(Graphics g, String text, String fontName, int point, int ratio, Color strokeColor, Color fillColor) {
-                Font font = new Font(fontName, Font.PLAIN, point);
-
-                float stroke = point / (float) ratio;
-
-                Graphics2D graphics = (Graphics2D) g;
-                graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                FontRenderContext frc = graphics.getFontRenderContext();
-
-                AttributedString as = new AttributedString(text);
-                as.addAttribute(TextAttribute.FONT, font, 0, text.length());
-                AttributedCharacterIterator aci = as.getIterator();
-
-                TextLayout tl = new TextLayout(aci, frc);
-                float sw = (float) tl.getBounds().getWidth();
-                float sh = (float) tl.getBounds().getHeight();
-                Shape shape = tl.getOutline(AffineTransform.getTranslateInstance((getWidth() - sw) / 2, (getHeight() - sh) / 2));
-                graphics.setColor(strokeColor);
-                graphics.setStroke(new BasicStroke(stroke));
-                graphics.draw(shape);
-                graphics.setColor(fillColor);
-                graphics.fill(shape);
+                Droppable.makeComponentSinglePathDroppable(this, Main.this::drop);
             }
             public void paintComponent(Graphics g) {
                 super.paintComponent(g);
 
                 if (images.size() == 0) {
+                    TextDrawer textDrawer = new TextDrawer("San Serif", 20, 12);
+                    textDrawer.setStrokeColors(Color.pink, Color.white);
                     String text = "Drop an archive file or a folder here";
-                    drawText(g, text, "San Serif", 20, 12, Color.pink, Color.white);
+                    textDrawer.draw(g, text, getWidth(), getHeight());
                 }
             }
         };
-        glass.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                if (e.isMetaDown()) {
-                    // start magnify
-//Debug.printf("mousePressed: %d, %d", e.getX(), e.getY());
-                    magnify.setLocation(e.getX() - magnify.getWidth() / 2, e.getY() - magnify.getHeight() / 2);
-                    magnify.setVisible(true);
-                    magnify.repaint();
-                }
-            }
-
-            @Override
-            public void mouseReleased(MouseEvent e) {
-                // end magnify
-//Debug.printf("mouseReleased: %d, %d", e.getX(), e.getY());
-                magnify.setVisible(false);
-                magnify.repaint();
-            }
-
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (!e.isMetaDown()) {
-                    int d = e.isShiftDown() ? 1 : 2;
-                    if (imageL.getBounds().contains(e.getX(), e.getY())) {
-                        nextPage(d);
-                    } else if (imageR.getBounds().contains(e.getX(), e.getY())) {
-                        prevPage(d);
-                    }
-                }
-            }
-        });
-        glass.addMouseMotionListener(new MouseAdapter() {
-            @Override
-            public void mouseDragged(MouseEvent e) {
-//Debug.printf("mouseDragged: %d, %d", e.getX(), e.getY());
-                magnify.setLocation(e.getX() - magnify.getWidth() / 2, e.getY() - magnify.getHeight() / 2);
-                magnify.repaint();
-            }
-        });
+        glass.addMouseListener(pager.getPagingAdapter());
         glass.setOpaque(false);
         glass.setLayout(null);
+
+        MagnifyingGlass magnify = new MagnifyingGlass(450, 450, (r, p) -> {
+            JImageComponent comp = null;
+            int dx = 0;
+            if (imageL.getBounds().contains(p.x, p.y)) {
+Debug.printf(Level.FINE, "mag left: " + imageL.getBounds());
+                comp = imageL;
+            } else if (imageR.getBounds().contains(p.x, p.y)) {
+Debug.printf(Level.FINE, "mag right: " + imageR.getBounds());
+                comp = imageR;
+                dx = Math.round(pages.getWidth() / 2f);
+            }
+            BufferedImage sub = null;
+            if (comp != null) {
+Debug.printf(Level.FINE, "mag area: %d, %d %d, %d", r.x - dx, r.y, r.width, r.height);
+                sub = comp.getSubimage(r.x - dx, r.y, r.width, r.height);
+            }
+            return sub;
+        });
+
+        glass.addMouseListener(magnify.getMouseAdapter());
+        glass.addMouseMotionListener(magnify.getMouseAdapter());
         glass.add(magnify);
 
-        panel = new JPanel();
-        panel.setBackground(Color.black);
-        panel.setLayout(new GridLayout(1, 2));
+        jumper = new Jumper(() -> {
+            if (images.size() > 0) {
+                jumper.setMinimum(0);
+                jumper.setMaximum(images.size() - 1);
+                jumper.setValue(index);
+
+                jumper.setText(label());
+            }
+        }, frame::requestFocus);
+        jumper.setSize(new Dimension(320, 80));
+        jumper.setLocation(0, 0);
+        jumper.addChangeListener(pager.getPagingAdapter());
+
+        glass.add(jumper);
+
+        pages = new JPanel();
+        pages.setBackground(Color.black);
+        pages.setLayout(new GridLayout(1, 2));
 
         hints = new HashMap<>();
         hints.put(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -566,18 +540,309 @@ System.setProperty("vavi.util.archive.zip.encoding", "ms932");
         imageR.setRenderingHints(hints);
         imageR.setImageVerticalAlignment(SwingConstants.CENTER);
 
-        panel.add(imageL);
-        panel.add(imageR);
+        pages.add(imageL);
+        pages.add(imageR);
 
         base = new JLayeredPane();
         base.setPreferredSize(new Dimension(w, h));
         base.add(glass);
-        base.add(panel);
+        base.add(pages);
 
         frame.setLocation(x, y);
         frame.setContentPane(base);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.pack();
         frame.setVisible(true);
+    }
+
+    static class Jumper extends JPanel {
+        JLabel label = new JLabel();
+        JSlider slider = new JSlider();
+
+        Runnable on;
+        Runnable off;
+
+        Jumper(Runnable on, Runnable off) {
+            this.on = on;
+            this.off = off;
+
+            label.setHorizontalAlignment(CENTER);
+            label.setVisible(false);
+
+            slider.setOpaque(false);
+            slider.setVisible(false);
+            slider.setInverted(true);
+
+            SliderKnobTooltip tooltip = new SliderKnobTooltip("%03d");
+            slider.addMouseListener(tooltip.getMouseAdapter());
+            slider.addMouseMotionListener(tooltip.getMouseAdapter());
+
+            setLayout(new GridLayout(2, 1));
+            Color c = new Color(Color.pink.getRed(), Color.pink.getGreen(), Color.pink.getBlue(), 0x40);
+            setBackground(c);
+            setOpaque(false); // need to keep visible for enter/exit, so make this transparent by opaque
+            addMouseListener(new MouseAdapter() {
+                @Override public void mouseEntered(MouseEvent e) {
+                    if (!slider.isVisible() && contains(e.getPoint())) {
+Debug.println("mouseEntered: " + e.getPoint() + ", " + getBounds());
+                        on.run();
+
+                        slider.setVisible(true);
+                        label.setVisible(true);
+                        setOpaque(true);
+                    }
+                }
+                @Override public void mouseExited(MouseEvent e) {
+Debug.println("mouseExited: " + e.getPoint() + ", " + getBounds() + ", " + !contains(e.getPoint()));
+                    if (slider.isVisible() && !isInside(e)) { // contains(e.getPoint())
+                        slider.setVisible(false);
+                        label.setVisible(false);
+                        setOpaque(false);
+
+                        off.run();
+                    }
+                }
+                boolean isInside(MouseEvent e) {
+                    Point p = new Point(e.getLocationOnScreen());
+                    SwingUtilities.convertPointFromScreen(p, e.getComponent());
+Debug.println("isInside: " + p);
+                    return e.getComponent().contains(p);
+                }
+            });
+
+            add(slider);
+            add(label);
+        }
+        /** add a pager adapter */
+        void addChangeListener(ChangeListener l) {
+            slider.addChangeListener(l);
+        }
+        void setText(String text) {
+            label.setText(text);
+        }
+        void setMinimum(int minimum) {
+            slider.setMinimum(minimum);
+        }
+        void setMaximum(int maximum) {
+            slider.setMaximum(maximum);
+        }
+        void setValue(int value) {
+            slider.setValue(value);
+        }
+    }
+
+    static class Pager {
+        private final Consumer<Integer> prev;
+        private final Consumer<Integer> next;
+        private final Consumer<Integer> jump;
+        private final Function<MouseEvent, Boolean> left;
+        private final Function<MouseEvent, Boolean> right;
+        public Pager(Consumer<Integer> prev, Consumer<Integer> next,
+              Function<MouseEvent, Boolean> left, Function<MouseEvent, Boolean> right,
+              Consumer<Integer> jump) {
+            this.prev = prev;
+            this.next = next;
+            this.left = left;
+            this.right = right;
+            this.jump = jump;
+        }
+        private static class PagingAdapter extends MouseAdapter implements MouseListener, KeyListener, ChangeListener {
+            @Override public void keyTyped(KeyEvent e) {}
+            @Override public void keyPressed(KeyEvent e) {}
+            @Override public void keyReleased(KeyEvent e) {}
+
+            @Override public void stateChanged(ChangeEvent e) {}
+        }
+        private final PagingAdapter pagingAdapter = new PagingAdapter() {
+            @Override public void keyPressed(KeyEvent e) {
+                int d = e.isShiftDown() ? 1 : 2;
+//Debug.println("move: " + d);
+                switch (e.getKeyCode()) {
+                case KeyEvent.VK_LEFT:
+                    next.accept(d);
+                    break;
+                case KeyEvent.VK_RIGHT:
+                    prev.accept(d);
+                    break;
+                case KeyEvent.VK_N:
+                    if (e.isControlDown()) {
+                        next.accept(d);
+                    }
+                    break;
+                case KeyEvent.VK_P:
+                    if (e.isControlDown()) {
+                        prev.accept(d);
+                    }
+                    break;
+                }
+            }
+            @Override public void mouseClicked(MouseEvent e) {
+                if (!e.isMetaDown()) {
+                    int d = e.isShiftDown() ? 1 : 2;
+                    if (left.apply(e)) {
+                        next.accept(d);
+                    } else if (right.apply(e)) {
+                        prev.accept(d);
+                    }
+                }
+            }
+            @Override public void stateChanged(ChangeEvent e) {
+                if (e.getSource() instanceof JSlider) {
+                    JSlider slider = (JSlider) e.getSource();
+                    if (!slider.getValueIsAdjusting() && slider.isVisible()) {
+                        int value = slider.getValue();
+Debug.println("slider index: " + value);
+                        jump.accept(value);
+                    }
+                }
+            }
+        };
+        public PagingAdapter getPagingAdapter() {
+            return pagingAdapter;
+        }
+    }
+
+    static class MagnifyingGlass extends JComponent {
+        private float magnitude = 10;
+        private final BiFunction<Rectangle, Point, BufferedImage> subImage;
+        public MagnifyingGlass(int width, int height, BiFunction<Rectangle, Point, BufferedImage> subImage) {
+            setSize(new Dimension(width, height));
+            setOpaque(false);
+            setVisible(false);
+            this.subImage = subImage;
+        }
+        public void setMagnitude(float magnitude) {
+            this.magnitude = magnitude;
+        }
+        private final MouseAdapter mouseAdapter = new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) {
+                if (e.isMetaDown()) {
+                    // start magnify
+//Debug.printf("mousePressed: %d, %d", e.getX(), e.getY());
+                    setLocation(e.getX() - getWidth() / 2, e.getY() - getHeight() / 2);
+                    setVisible(true);
+                    repaint();
+                }
+            }
+            @Override public void mouseReleased(MouseEvent e) {
+                // end magnify
+//Debug.printf("mouseReleased: %d, %d", e.getX(), e.getY());
+                setVisible(false);
+                repaint();
+            }
+            @Override public void mouseDragged(MouseEvent e) {
+//Debug.printf("mouseDragged: %d, %d", e.getX(), e.getY());
+                setLocation(e.getX() - getWidth() / 2, e.getY() - getHeight() / 2);
+                repaint();
+            }
+        };
+        /** must add both addMouseListener and addMouseMotionListener! */
+        public MouseAdapter getMouseAdapter() {
+            return mouseAdapter;
+        }
+        @Override public void paintComponent(Graphics g) {
+            super.paintComponent(g);
+
+            int w = Math.round(getWidth() / magnitude);
+            int h = Math.round(getHeight() / magnitude);
+            int x = getX() + Math.round((getWidth() - w) / 2f);
+            int y = getY() + Math.round((getHeight() - h) / 2f);
+Debug.printf(Level.FINE, "magnify: %d, %d %d, %d", x, y, w, h);
+            int mx = getX() + Math.round(getWidth() / 2f);
+            int my = getY() + Math.round(getHeight() / 2f);
+            BufferedImage sub = subImage.apply(new Rectangle(x, y, w, h), new Point(mx, my));
+            if (sub != null) {
+//                ((Graphics2D) g).setRenderingHints(hints);
+                g.setClip(new Ellipse2D.Float(0, 0, getWidth(), getHeight()));
+                g.drawImage(sub, 0, 0, getWidth(), getHeight(), null);
+            }
+//g.setColor(Color.green);
+//Debug.printf("green: %d, %d %d, %d", x - getX(), y - getY(), w, h);
+//g.drawRect(x - getX(), y - getY(), w, h);
+        }
+    }
+
+    static class TextDrawer {
+        private final Font font;
+        private final float stroke;
+        private Color strokeColor;
+        private Color fillColor;
+        private int alignmentX = CENTER; // TODO
+        private int alignmentY = CENTER; // TODO
+        public TextDrawer(String fontName, int point, int ratio) {
+            this.font = new Font(fontName, Font.PLAIN, point);
+            this.stroke = point / (float) ratio;
+        }
+        public void setStrokeColors(Color strokeColor, Color fillColor) {
+            this.strokeColor = strokeColor;
+            this.fillColor = fillColor;
+        }
+        public void setImageHorizontalAlignment(int alignment) {
+            this.alignmentX = alignment;
+        }
+        public void setImageVerticalAlignment(int alignment) {
+            this.alignmentY = alignment;
+        }
+        public void draw(Graphics g, String text, int width, int height) {
+
+            Graphics2D graphics = (Graphics2D) g;
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            FontRenderContext frc = graphics.getFontRenderContext();
+
+            AttributedString as = new AttributedString(text);
+            as.addAttribute(TextAttribute.FONT, font, 0, text.length());
+            AttributedCharacterIterator aci = as.getIterator();
+
+            TextLayout tl = new TextLayout(aci, frc);
+            float sw = (float) tl.getBounds().getWidth();
+            float sh = (float) tl.getBounds().getHeight();
+            Shape shape = tl.getOutline(AffineTransform.getTranslateInstance((width - sw) / 2, (height - sh) / 2));
+            graphics.setColor(strokeColor);
+            graphics.setStroke(new BasicStroke(stroke));
+            graphics.draw(shape);
+            graphics.setColor(fillColor);
+            graphics.fill(shape);
+        }
+    }
+
+    static class SliderKnobTooltip {
+        private final JWindow toolTip = new JWindow();
+        private final JLabel label = new JLabel("", SwingConstants.CENTER);
+        private final Dimension size = new Dimension(30, 20);
+        private final String format;
+        public SliderKnobTooltip(String format) {
+            this.format = format;
+            label.setOpaque(false);
+            label.setBackground(UIManager.getColor("ToolTip.background"));
+            label.setBorder(UIManager.getBorder("ToolTip.border"));
+            toolTip.add(label);
+            toolTip.setSize(size);
+        }
+        /** must add both addMouseListener and addMouseMotionListener! */
+        public MouseAdapter getMouseAdapter() {
+            return mouseAdapter;
+        }
+        private final MouseAdapter mouseAdapter = new MouseAdapter() {
+            @Override public void mouseDragged(MouseEvent e){
+                updateToolTip(e);
+            }
+            @Override public void mousePressed(MouseEvent e){
+                toolTip.setVisible(true);
+                updateToolTip(e);
+            }
+            @Override public void mouseReleased(MouseEvent e){
+                toolTip.setVisible(false);
+            }
+            void updateToolTip(MouseEvent e) {
+                JSlider slider = (JSlider) e.getSource();
+                label.setText(String.format(format, slider.getValue()));
+                Point p = e.getPoint();
+                p.y = -size.height;
+                SwingUtilities.convertPointToScreen(p, (Component) e.getSource());
+                p.translate(-size.width / 2, 0);
+                toolTip.setLocation(p);
+            }
+        };
     }
 }
