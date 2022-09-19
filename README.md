@@ -1,5 +1,5 @@
 [![Release](https://jitpack.io/v/umjammer/vavi-apps-comicviewer.svg)](https://jitpack.io/#umjammer/vavi-apps-comicviewer)
-[![Java CI](https://github.com/umjammer/vavi-apps-comicviewer-avif/actions/workflows/maven.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer-avif/actions/workflows/maven.yml)
+[![Java CI](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven.yml)
 [![CodeQL](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/codeql-analysis.yml)
 ![Java](https://img.shields.io/badge/Java-8-b07219)
 
@@ -25,6 +25,8 @@ this is a stopgap until Ventura (support avif natively) release.
    * right arrow
  * magnify ...
    * click w/ the command key and drag
+ * jump...
+   * move cursor left top corner, the paging slider will appear
 
 ## Remarkable Points
 
