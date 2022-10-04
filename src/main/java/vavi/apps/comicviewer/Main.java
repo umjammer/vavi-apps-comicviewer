@@ -81,7 +81,7 @@ import vavi.awt.dnd.Droppable;
 import vavi.swing.JImageComponent;
 import vavi.util.Debug;
 import vavi.util.archive.Archives;
-import vavi.util.archive.zip.ZipArchive;
+import vavi.util.archive.zip.JdkZipArchive;
 
 import static javax.swing.SwingConstants.CENTER;
 
@@ -391,13 +391,13 @@ Debug.println("index: " + index);
 
     boolean drop(Path path) {
         try {
-            System.setProperty(ZipArchive.ZIP_ENCODING, "utf-8");
+            System.setProperty(JdkZipArchive.ZIP_ENCODING, "utf-8");
             init(path, 0);
             return true;
         } catch (IllegalArgumentException e) {
             if (e.getMessage().equals("MALFORMED")) {
 Debug.println("zip reading failure by utf-8, retry using ms932");
-                System.setProperty(ZipArchive.ZIP_ENCODING, "ms932");
+                System.setProperty(JdkZipArchive.ZIP_ENCODING, "ms932");
                 init(path, 0);
                 return true;
             } else {
