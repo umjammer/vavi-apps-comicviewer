@@ -95,6 +95,12 @@ import static javax.swing.SwingConstants.CENTER;
 
 /**
  * Main.
+ * <p>
+ * TODO
+ *  - opening jumper, prev/next by key made index confuse?
+ *  - after jump page, treat caching well
+ *  - recent
+ *  - when open by .app, filename is weired
  *
  * @author <a href="mailto:umjammer@gmail.com">Naohide Sano</a> (nsano)
  * @version 0.00 2022-09-08 nsano initial version <br>
@@ -122,7 +128,7 @@ Debug.println("shutdownHook");
             if (app.fs != null) {
                 try {
                     app.fs.close();
-                    Debug.println("close fs");
+Debug.println("close fs");
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -146,7 +152,7 @@ Debug.println("shutdownHook");
                     application.setOpenFileHandler(openFilesEvent -> {
                         List<File> files = openFilesEvent.getFiles();
                         // TODO file name is weired
-                        Debug.println(Level.FINE, "files: " + files.size() + ", " + (files.size() > 0 ? files.get(0) : ""));
+Debug.println(Level.FINE, "files: " + files.size() + ", " + (files.size() > 0 ? files.get(0) : ""));
                         app.init(Paths.get(files.get(0).getPath()), 0);
                     });
                 } catch (Throwable ex) {
@@ -869,6 +875,7 @@ Debug.printf(Level.FINE, "magnify: %d, %d %d, %d", x, y, w, h);
         }
     }
 
+    /** @see "https://ateraimemo.com/Swing/SliderToolTips.html" */
     static class SliderKnobTooltip {
         private final JWindow toolTip = new JWindow();
         private final JLabel label = new JLabel("", SwingConstants.CENTER);

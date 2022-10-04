@@ -27,12 +27,15 @@ this is a stopgap until Ventura (support avif natively) release.
    * click w/ the command key and drag
  * jump...
    * move cursor left top corner, the paging slider will appear
+ * full screen...
+   * ⌘F toggle
+   * via view menu toggle
 
 ## Remarkable Points
 
- * drop and open via dock icon
- * resizing smaller/larger keeping aspect ratio
  * avif
+ * drop and open via dock icon (mac java)
+ * resizing smaller/larger keeping aspect ratio component
 
 ## TODO
 
@@ -50,3 +53,6 @@ this is a stopgap until Ventura (support avif natively) release.
    * wip: not work on .app
  * ~~sibling files menu~~
    * wip: not work on .app
+ * coverflow
+   * https://github.com/umjammer/jflow 
+ * https://github.com/ymasory/OrangeExtensions
