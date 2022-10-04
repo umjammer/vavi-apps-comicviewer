@@ -14,13 +14,18 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
 import java.awt.GridLayout;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Shape;
+import java.awt.Toolkit;
+import java.awt.Window;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
@@ -58,6 +63,7 @@ import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -77,6 +83,7 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
 import com.apple.eawt.Application;
+import com.apple.eawt.FullScreenUtilities;
 import vavi.awt.dnd.Droppable;
 import vavi.swing.JImageComponent;
 import vavi.util.Debug;
@@ -94,6 +101,13 @@ import static javax.swing.SwingConstants.CENTER;
  */
 public class Main {
 
+    void storeBounds() {
+        prefs.putInt("lastX", frame.getX());
+        prefs.putInt("lastY", frame.getY());
+        prefs.putInt("lastWidth", Math.max(base.getWidth(), 160));
+        prefs.putInt("lastHeight", Math.max(base.getHeight(), 120));
+    }
+
     /**
      * @param args none
      */
@@ -103,10 +117,7 @@ public class Main {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 Debug.println("shutdownHook");
             app.prefs.putInt("lastIndex", app.index);
-            app.prefs.putInt("lastX", app.frame.getX());
-            app.prefs.putInt("lastY", app.frame.getY());
-            app.prefs.putInt("lastWidth", Math.max(app.base.getWidth(), 160));
-            app.prefs.putInt("lastHeight", Math.max(app.base.getHeight(), 120));
+            app.storeBounds();
             app.prefs.put("lastPath", String.valueOf(app.path));
             if (app.fs != null) {
                 try {
@@ -126,9 +137,8 @@ Debug.println("shutdownHook");
                 app.init(p, 0);
             }
         } else {
-            String osName = System.getProperty("os.name").toLowerCase();
             // existing `CFProcessPath` means this program is executed by .app
-            if (osName.contains("mac") && System.getenv("CFProcessPath") != null) {
+            if (app.isMac() && System.getenv("CFProcessPath") != null) {
                 try {
                     // https://alvinalexander.com/blog/post/jfc-swing/java-handle-drag-drop-events-mac-osx-dock-application-icon-2/
                     Application application = Application.getApplication();
@@ -337,6 +347,7 @@ Debug.println(e.getMessage());
     JPanel pages;
     JPanel glass;
     Jumper jumper;
+    JCheckBoxMenuItem fullScreen;
 
     // model
     Path path;
@@ -357,6 +368,7 @@ Debug.println(e.getMessage());
     }
 
     void updateView() {
+        frame.validate();
         frame.repaint();
 //Debug.println("glass: " + glass.getBounds());
 //Debug.println("base: " + base.getBounds());
@@ -422,11 +434,45 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
                 index + 1 < images.size() ? abbreviate(images.get(index + 1), 17) : "");
     }
 
-    void gui() {
+    boolean isMac() {
+        String osName = System.getProperty("os.name").toLowerCase();
+        return osName.contains("mac");
+    }
+
+    public boolean isFullScreen(Window window) {
+        Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
+Debug.println("isFullScreen: " + (size.width == window.getWidth() && size.height == window.getHeight()));
+        return size.width == window.getWidth() && size.height == window.getHeight();
+    }
+
+    void setFullScreen(boolean enabled) {
+        if (isMac()) {
+            Application.getApplication().requestToggleFullScreen(frame);
+        } else {
+            GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+
+            if (gd.isFullScreenSupported() & enabled) {
+                frame.setUndecorated(true);
+                gd.setFullScreenWindow(frame); // TODO how to off?
+            }
+        }
+Debug.println(Level.FINE, "fullScreen: " + enabled);
+    }
+
+    Rectangle restoreBounds() {
         int x = prefs.getInt("lastX", 0);
         int y = prefs.getInt("lastY", 0);
         int w = prefs.getInt("lastWidth", 1600);
         int h = prefs.getInt("lastHeight", 1200);
+        return new Rectangle(x, y, w, h);
+    }
+
+    void gui() {
+        Rectangle fr = restoreBounds();
+        int x = fr.x;
+        int y = fr.y;
+        int w = fr.width;
+        int h = fr.height;
 
         Pager pager = new Pager(this::prevPage, this::nextPage,
                 e -> imageL.getBounds().contains(e.getPoint()),
@@ -440,11 +486,19 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
 
         frame = new JFrame();
         frame.addKeyListener(pager.getPagingAdapter());
+        frame.addKeyListener(new KeyAdapter() {
+            @Override public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_F && e.isMetaDown()) {
+                    setFullScreen(!fullScreen.isSelected());
+                }
+            }
+        });
         frame.addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentResized(ComponentEvent e) {
+            @Override public void componentResized(ComponentEvent e) {
+Debug.println("componentResized: " + e.getComponent().getBounds());
                 glass.setSize(base.getSize());
                 pages.setSize(base.getSize());
+                fullScreen.setSelected(isFullScreen(frame));
                 updateView();
             }
         });
@@ -460,8 +514,13 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
         fileMenu.add(openRecentMenu);
         fileMenu.add(openSiblingMenu);
         fileMenu.add(closeMenu);
+        fullScreen = new JCheckBoxMenuItem("Full Screen");
+        fullScreen.addActionListener(e -> { setFullScreen(fullScreen.isSelected()); updateView(); });
+        JMenu viewMenu = new JMenu("View");
+        viewMenu.add(fullScreen);
         JMenuBar menuBar = new JMenuBar();
         menuBar.add(fileMenu);
+        menuBar.add(viewMenu);
 
         frame.setJMenuBar(menuBar);
 
@@ -547,6 +606,10 @@ Debug.printf(Level.FINE, "mag area: %d, %d %d, %d", r.x - dx, r.y, r.width, r.he
         base.setPreferredSize(new Dimension(w, h));
         base.add(glass);
         base.add(pages);
+
+        if (isMac()) {
+            FullScreenUtilities.setWindowCanFullScreen(frame, true);
+        }
 
         frame.setLocation(x, y);
         frame.setContentPane(base);
