@@ -6,36 +6,21 @@
 
 package vavi.apps.comicviewer;
 
-import java.awt.BasicStroke;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.GridLayout;
-import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
-import java.awt.Shape;
 import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.font.FontRenderContext;
-import java.awt.font.TextAttribute;
-import java.awt.font.TextLayout;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -47,8 +32,6 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.AttributedCharacterIterator;
-import java.text.AttributedString;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -57,30 +40,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
 import javax.swing.JCheckBoxMenuItem;
-import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JSlider;
-import javax.swing.JWindow;
 import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 
 import com.apple.eawt.Application;
 import com.apple.eawt.FullScreenUtilities;
@@ -89,8 +61,6 @@ import vavi.swing.JImageComponent;
 import vavi.util.Debug;
 import vavi.util.archive.Archives;
 import vavi.util.archive.zip.JdkZipArchive;
-
-import static javax.swing.SwingConstants.CENTER;
 
 
 /**
@@ -622,297 +592,5 @@ Debug.printf(Level.FINE, "mag area: %d, %d %d, %d", r.x - dx, r.y, r.width, r.he
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.pack();
         frame.setVisible(true);
-    }
-
-    static class Jumper extends JPanel {
-        JLabel label = new JLabel();
-        JSlider slider = new JSlider();
-
-        Runnable on;
-        Runnable off;
-
-        Jumper(Runnable on, Runnable off) {
-            this.on = on;
-            this.off = off;
-
-            label.setHorizontalAlignment(CENTER);
-            label.setVisible(false);
-
-            slider.setOpaque(false);
-            slider.setVisible(false);
-            slider.setInverted(true);
-
-            SliderKnobTooltip tooltip = new SliderKnobTooltip("%03d");
-            slider.addMouseListener(tooltip.getMouseAdapter());
-            slider.addMouseMotionListener(tooltip.getMouseAdapter());
-
-            setLayout(new GridLayout(2, 1));
-            Color c = new Color(Color.pink.getRed(), Color.pink.getGreen(), Color.pink.getBlue(), 0x40);
-            setBackground(c);
-            setOpaque(false); // need to keep visible for enter/exit, so make this transparent by opaque
-            addMouseListener(new MouseAdapter() {
-                @Override public void mouseEntered(MouseEvent e) {
-                    if (!slider.isVisible() && contains(e.getPoint())) {
-Debug.println("mouseEntered: " + e.getPoint() + ", " + getBounds());
-                        on.run();
-
-                        slider.setVisible(true);
-                        label.setVisible(true);
-                        setOpaque(true);
-                    }
-                }
-                @Override public void mouseExited(MouseEvent e) {
-Debug.println("mouseExited: " + e.getPoint() + ", " + getBounds() + ", " + !contains(e.getPoint()));
-                    if (slider.isVisible() && !isInside(e)) { // contains(e.getPoint())
-                        slider.setVisible(false);
-                        label.setVisible(false);
-                        setOpaque(false);
-
-                        off.run();
-                    }
-                }
-                boolean isInside(MouseEvent e) {
-                    Point p = new Point(e.getLocationOnScreen());
-                    SwingUtilities.convertPointFromScreen(p, e.getComponent());
-Debug.println("isInside: " + p);
-                    return e.getComponent().contains(p);
-                }
-            });
-
-            add(slider);
-            add(label);
-        }
-        /** add a pager adapter */
-        void addChangeListener(ChangeListener l) {
-            slider.addChangeListener(l);
-        }
-        void setText(String text) {
-            label.setText(text);
-        }
-        void setMinimum(int minimum) {
-            slider.setMinimum(minimum);
-        }
-        void setMaximum(int maximum) {
-            slider.setMaximum(maximum);
-        }
-        void setValue(int value) {
-            slider.setValue(value);
-        }
-    }
-
-    static class Pager {
-        private final Consumer<Integer> prev;
-        private final Consumer<Integer> next;
-        private final Consumer<Integer> jump;
-        private final Function<MouseEvent, Boolean> left;
-        private final Function<MouseEvent, Boolean> right;
-        public Pager(Consumer<Integer> prev, Consumer<Integer> next,
-              Function<MouseEvent, Boolean> left, Function<MouseEvent, Boolean> right,
-              Consumer<Integer> jump) {
-            this.prev = prev;
-            this.next = next;
-            this.left = left;
-            this.right = right;
-            this.jump = jump;
-        }
-        private static class PagingAdapter extends MouseAdapter implements MouseListener, KeyListener, ChangeListener {
-            @Override public void keyTyped(KeyEvent e) {}
-            @Override public void keyPressed(KeyEvent e) {}
-            @Override public void keyReleased(KeyEvent e) {}
-
-            @Override public void stateChanged(ChangeEvent e) {}
-        }
-        private final PagingAdapter pagingAdapter = new PagingAdapter() {
-            @Override public void keyPressed(KeyEvent e) {
-                int d = e.isShiftDown() ? 1 : 2;
-//Debug.println("move: " + d);
-                switch (e.getKeyCode()) {
-                case KeyEvent.VK_LEFT:
-                    next.accept(d);
-                    break;
-                case KeyEvent.VK_RIGHT:
-                    prev.accept(d);
-                    break;
-                case KeyEvent.VK_N:
-                    if (e.isControlDown()) {
-                        next.accept(d);
-                    }
-                    break;
-                case KeyEvent.VK_P:
-                    if (e.isControlDown()) {
-                        prev.accept(d);
-                    }
-                    break;
-                }
-            }
-            @Override public void mouseClicked(MouseEvent e) {
-                if (!e.isMetaDown()) {
-                    int d = e.isShiftDown() ? 1 : 2;
-                    if (left.apply(e)) {
-                        next.accept(d);
-                    } else if (right.apply(e)) {
-                        prev.accept(d);
-                    }
-                }
-            }
-            @Override public void stateChanged(ChangeEvent e) {
-                if (e.getSource() instanceof JSlider) {
-                    JSlider slider = (JSlider) e.getSource();
-                    if (!slider.getValueIsAdjusting() && slider.isVisible()) {
-                        int value = slider.getValue();
-Debug.println("slider index: " + value);
-                        jump.accept(value);
-                    }
-                }
-            }
-        };
-        public PagingAdapter getPagingAdapter() {
-            return pagingAdapter;
-        }
-    }
-
-    static class MagnifyingGlass extends JComponent {
-        private float magnitude = 10;
-        private final BiFunction<Rectangle, Point, BufferedImage> subImage;
-        public MagnifyingGlass(int width, int height, BiFunction<Rectangle, Point, BufferedImage> subImage) {
-            setSize(new Dimension(width, height));
-            setOpaque(false);
-            setVisible(false);
-            this.subImage = subImage;
-        }
-        public void setMagnitude(float magnitude) {
-            this.magnitude = magnitude;
-        }
-        private final MouseAdapter mouseAdapter = new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent e) {
-                if (e.isMetaDown()) {
-                    // start magnify
-//Debug.printf("mousePressed: %d, %d", e.getX(), e.getY());
-                    setLocation(e.getX() - getWidth() / 2, e.getY() - getHeight() / 2);
-                    setVisible(true);
-                    repaint();
-                }
-            }
-            @Override public void mouseReleased(MouseEvent e) {
-                // end magnify
-//Debug.printf("mouseReleased: %d, %d", e.getX(), e.getY());
-                setVisible(false);
-                repaint();
-            }
-            @Override public void mouseDragged(MouseEvent e) {
-//Debug.printf("mouseDragged: %d, %d", e.getX(), e.getY());
-                setLocation(e.getX() - getWidth() / 2, e.getY() - getHeight() / 2);
-                repaint();
-            }
-        };
-        /** must add both addMouseListener and addMouseMotionListener! */
-        public MouseAdapter getMouseAdapter() {
-            return mouseAdapter;
-        }
-        @Override public void paintComponent(Graphics g) {
-            super.paintComponent(g);
-
-            int w = Math.round(getWidth() / magnitude);
-            int h = Math.round(getHeight() / magnitude);
-            int x = getX() + Math.round((getWidth() - w) / 2f);
-            int y = getY() + Math.round((getHeight() - h) / 2f);
-Debug.printf(Level.FINE, "magnify: %d, %d %d, %d", x, y, w, h);
-            int mx = getX() + Math.round(getWidth() / 2f);
-            int my = getY() + Math.round(getHeight() / 2f);
-            BufferedImage sub = subImage.apply(new Rectangle(x, y, w, h), new Point(mx, my));
-            if (sub != null) {
-//                ((Graphics2D) g).setRenderingHints(hints);
-                g.setClip(new Ellipse2D.Float(0, 0, getWidth(), getHeight()));
-                g.drawImage(sub, 0, 0, getWidth(), getHeight(), null);
-            }
-//g.setColor(Color.green);
-//Debug.printf("green: %d, %d %d, %d", x - getX(), y - getY(), w, h);
-//g.drawRect(x - getX(), y - getY(), w, h);
-        }
-    }
-
-    static class TextDrawer {
-        private final Font font;
-        private final float stroke;
-        private Color strokeColor;
-        private Color fillColor;
-        private int alignmentX = CENTER; // TODO
-        private int alignmentY = CENTER; // TODO
-        public TextDrawer(String fontName, int point, int ratio) {
-            this.font = new Font(fontName, Font.PLAIN, point);
-            this.stroke = point / (float) ratio;
-        }
-        public void setStrokeColors(Color strokeColor, Color fillColor) {
-            this.strokeColor = strokeColor;
-            this.fillColor = fillColor;
-        }
-        public void setImageHorizontalAlignment(int alignment) {
-            this.alignmentX = alignment;
-        }
-        public void setImageVerticalAlignment(int alignment) {
-            this.alignmentY = alignment;
-        }
-        public void draw(Graphics g, String text, int width, int height) {
-
-            Graphics2D graphics = (Graphics2D) g;
-            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            FontRenderContext frc = graphics.getFontRenderContext();
-
-            AttributedString as = new AttributedString(text);
-            as.addAttribute(TextAttribute.FONT, font, 0, text.length());
-            AttributedCharacterIterator aci = as.getIterator();
-
-            TextLayout tl = new TextLayout(aci, frc);
-            float sw = (float) tl.getBounds().getWidth();
-            float sh = (float) tl.getBounds().getHeight();
-            Shape shape = tl.getOutline(AffineTransform.getTranslateInstance((width - sw) / 2, (height - sh) / 2));
-            graphics.setColor(strokeColor);
-            graphics.setStroke(new BasicStroke(stroke));
-            graphics.draw(shape);
-            graphics.setColor(fillColor);
-            graphics.fill(shape);
-        }
-    }
-
-    /** @see "https://ateraimemo.com/Swing/SliderToolTips.html" */
-    static class SliderKnobTooltip {
-        private final JWindow toolTip = new JWindow();
-        private final JLabel label = new JLabel("", SwingConstants.CENTER);
-        private final Dimension size = new Dimension(30, 20);
-        private final String format;
-        public SliderKnobTooltip(String format) {
-            this.format = format;
-            label.setOpaque(false);
-            label.setBackground(UIManager.getColor("ToolTip.background"));
-            label.setBorder(UIManager.getBorder("ToolTip.border"));
-            toolTip.add(label);
-            toolTip.setSize(size);
-        }
-        /** must add both addMouseListener and addMouseMotionListener! */
-        public MouseAdapter getMouseAdapter() {
-            return mouseAdapter;
-        }
-        private final MouseAdapter mouseAdapter = new MouseAdapter() {
-            @Override public void mouseDragged(MouseEvent e){
-                updateToolTip(e);
-            }
-            @Override public void mousePressed(MouseEvent e){
-                toolTip.setVisible(true);
-                updateToolTip(e);
-            }
-            @Override public void mouseReleased(MouseEvent e){
-                toolTip.setVisible(false);
-            }
-            void updateToolTip(MouseEvent e) {
-                JSlider slider = (JSlider) e.getSource();
-                label.setText(String.format(format, slider.getValue()));
-                Point p = e.getPoint();
-                p.y = -size.height;
-                SwingUtilities.convertPointToScreen(p, (Component) e.getSource());
-                p.translate(-size.width / 2, 0);
-                toolTip.setLocation(p);
-            }
-        };
     }
 }
