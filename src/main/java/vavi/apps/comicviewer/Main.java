@@ -56,6 +56,8 @@ import javax.swing.SwingConstants;
 
 import com.apple.eawt.Application;
 import com.apple.eawt.FullScreenUtilities;
+import org.rococoa.cocoa.foundation.NSNumber;
+import org.rococoa.cocoa.foundation.NSObject;
 import vavi.awt.dnd.Droppable;
 import vavi.swing.JImageComponent;
 import vavi.util.Debug;
@@ -324,6 +326,7 @@ Debug.println(e.getMessage());
     JPanel glass;
     Jumper jumper;
     JCheckBoxMenuItem fullScreen;
+    JCheckBoxMenuItem filter;
 
     // model
     Path path;
@@ -350,12 +353,27 @@ Debug.println(e.getMessage());
 //Debug.println("base: " + base.getBounds());
     }
 
+    BufferedImage sharpFilter(BufferedImage image) {
+        Map<String, NSObject> options = new HashMap<>();
+        options.put("inputIntensity", NSNumber.of(2.0));
+        options.put("inputRadius", NSNumber.of(1.0));
+        return new CIFilterOp("CIUnsharpMask", options).filter(image, null);
+    }
+
+    BufferedImage getFilteredImage(int index) {
+        BufferedImage image = getImage(index);
+        if (filter.isSelected()) {
+            return sharpFilter(image);
+        }
+        return image;
+    }
+
     void updateModel() {
         frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
 Debug.println("index: " + index);
-        imageR.setImage(index < images.size() ? getImage(index) : null);
-        imageL.setImage(index + 1 < images.size() ? getImage(index + 1) : null);
+        imageR.setImage(index < images.size() ? getFilteredImage(index) : null);
+        imageL.setImage(index + 1 < images.size() ? getFilteredImage(index + 1) : null);
 
         frame.setCursor(Cursor.getDefaultCursor());
 
@@ -494,9 +512,14 @@ Debug.println("componentResized: " + e.getComponent().getBounds());
         fullScreen.addActionListener(e -> { setFullScreen(fullScreen.isSelected()); updateView(); });
         JMenu viewMenu = new JMenu("View");
         viewMenu.add(fullScreen);
+        filter = new JCheckBoxMenuItem("Filter");
+        filter.addActionListener(e -> { updateModel(); });
+        JMenu filterMenu = new JMenu("Filter");
+        filterMenu.add(filter);
         JMenuBar menuBar = new JMenuBar();
         menuBar.add(fileMenu);
         menuBar.add(viewMenu);
+        menuBar.add(filterMenu);
 
         frame.setJMenuBar(menuBar);
 

@@ -33,6 +33,33 @@
       </plugin>
 
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.3.0</version>
+        <executions>
+          <execution>
+            <id>copy</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.rococoa</groupId>
+                  <artifactId>rococoa-core</artifactId>
+                  <type>dylib</type>
+                  <overWrite>false</overWrite>
+                  <outputDirectory>${project.build.testOutputDirectory}</outputDirectory>
+                  <destFileName>librococoa.dylib</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
         <groupId>pl.project13.maven</groupId>
         <artifactId>git-commit-id-plugin</artifactId>
         <version>4.9.10</version>
@@ -83,6 +110,7 @@
 
               <vmArgs>
                 <vmArg>-Djna.library.path=/usr/local/lib</vmArg>
+                <vmArg>-Djava.library.path=.</vmArg>
                 <vmArg>-Dapple.laf.useScreenMenuBar=true</vmArg>
                 <vmArg>-Djava.util.logging.config.file=./logging.properties</vmArg>
               </vmArgs>
@@ -212,6 +240,16 @@
       <groupId>com.github.umjammer</groupId>
       <artifactId>vavi-util-logging-asl</artifactId>
       <version>0.0.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.rococoa</groupId>
+      <artifactId>rococoa-core</artifactId>
+      <version>${rococoa.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.rococoa</groupId>
+      <artifactId>rococoa-contrib</artifactId>
+      <version>${rococoa.version}</version>
     </dependency>
 
     <dependency>
