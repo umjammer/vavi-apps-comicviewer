@@ -56,3 +56,4 @@ this is a stopgap until Ventura (support avif natively) release.
  * coverflow
    * https://github.com/umjammer/jflow 
  * https://github.com/ymasory/OrangeExtensions
+ * https://github.com/dmMaze/comic-text-detector

@@ -10,6 +10,8 @@
   <properties>
     <javapackager.name>zzzViewer</javapackager.name>
     <javapackager.assetsDir>src/main/package</javapackager.assetsDir>
+    <rococoa.version>0.8.5-SNAPSHOT</rococoa.version>
+    <javacpp.platform>macosx-x86_64</javacpp.platform>
   </properties>
 
   <name>${javapackager.assetsDir}</name>
@@ -198,7 +200,7 @@
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
-        <version>5.8.2</version>
+        <version>5.9.0</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -251,6 +253,25 @@
       <artifactId>rococoa-contrib</artifactId>
       <version>${rococoa.version}</version>
     </dependency>
+
+    <dependency>
+      <groupId>com.github.araxeus</groupId>
+      <artifactId>dnnsuperres</artifactId>
+      <version>1.0.1-SNAPSHOT</version>
+    </dependency>
+    <dependency> <!-- why not included -->
+      <groupId>org.bytedeco</groupId>
+      <artifactId>opencv-platform</artifactId>
+      <version>4.5.5-1.5.7</version>
+    </dependency>
+
+<!-- too slow
+    <dependency>
+      <groupId>vavi</groupId>
+      <artifactId>vavi-image-dlfilter</artifactId>
+      <version>0.0.1-SNAPSHOT</version>
+    </dependency>
+-->
 
     <dependency>
       <groupId>org.junit.jupiter</groupId>

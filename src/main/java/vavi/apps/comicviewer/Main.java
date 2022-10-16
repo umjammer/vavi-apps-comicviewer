@@ -38,6 +38,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -56,8 +57,6 @@ import javax.swing.SwingConstants;
 
 import com.apple.eawt.Application;
 import com.apple.eawt.FullScreenUtilities;
-import org.rococoa.cocoa.foundation.NSNumber;
-import org.rococoa.cocoa.foundation.NSObject;
 import vavi.awt.dnd.Droppable;
 import vavi.swing.JImageComponent;
 import vavi.util.Debug;
@@ -326,7 +325,7 @@ Debug.println(e.getMessage());
     JPanel glass;
     Jumper jumper;
     JCheckBoxMenuItem fullScreen;
-    JCheckBoxMenuItem filter;
+    Map<Filter, JCheckBoxMenuItem> filterMenuItems = new HashMap<>();
 
     // model
     Path path;
@@ -353,17 +352,14 @@ Debug.println(e.getMessage());
 //Debug.println("base: " + base.getBounds());
     }
 
-    BufferedImage sharpFilter(BufferedImage image) {
-        Map<String, NSObject> options = new HashMap<>();
-        options.put("inputIntensity", NSNumber.of(2.0));
-        options.put("inputRadius", NSNumber.of(1.0));
-        return new CIFilterOp("CIUnsharpMask", options).filter(image, null);
-    }
-
     BufferedImage getFilteredImage(int index) {
         BufferedImage image = getImage(index);
-        if (filter.isSelected()) {
-            return sharpFilter(image);
+        for (Filter filter : filterMenuItems.keySet()) {
+Debug.println(Level.FINER, "filter: " + filter.getName() + ", " + filterMenuItems.get(filter).isSelected());
+            if (filterMenuItems.get(filter).isSelected()) {
+Debug.println(Level.FINER, "using filter: " + filter.getName());
+                image = filter.filter(image);
+            }
         }
         return image;
     }
@@ -508,14 +504,20 @@ Debug.println("componentResized: " + e.getComponent().getBounds());
         fileMenu.add(openRecentMenu);
         fileMenu.add(openSiblingMenu);
         fileMenu.add(closeMenu);
+
         fullScreen = new JCheckBoxMenuItem("Full Screen");
         fullScreen.addActionListener(e -> { setFullScreen(fullScreen.isSelected()); updateView(); });
         JMenu viewMenu = new JMenu("View");
         viewMenu.add(fullScreen);
-        filter = new JCheckBoxMenuItem("Filter");
-        filter.addActionListener(e -> { updateModel(); });
+
+        ServiceLoader<Filter> loader = ServiceLoader.load(Filter.class);
         JMenu filterMenu = new JMenu("Filter");
-        filterMenu.add(filter);
+        loader.forEach(filter -> {
+            JCheckBoxMenuItem filterMenuItem = new JCheckBoxMenuItem(filter.getName());
+            filterMenuItem.addActionListener(e -> { updateModel(); });
+            filterMenuItems.put(filter, filterMenuItem);
+            filterMenu.add(filterMenuItem);
+        });
         JMenuBar menuBar = new JMenuBar();
         menuBar.add(fileMenu);
         menuBar.add(viewMenu);
