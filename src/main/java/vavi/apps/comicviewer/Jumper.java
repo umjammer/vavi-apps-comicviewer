@@ -80,7 +80,7 @@ Debug.println("mouseExited: " + e.getPoint() + ", " + getBounds() + ", " + !cont
                 }
             }
 
-            boolean isInside(MouseEvent e) {
+            static boolean isInside(MouseEvent e) {
                 Point p = new Point(e.getLocationOnScreen());
                 SwingUtilities.convertPointFromScreen(p, e.getComponent());
 Debug.println("isInside: " + p);

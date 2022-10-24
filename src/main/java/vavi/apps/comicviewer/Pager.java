@@ -94,8 +94,7 @@ class Pager {
 
         @Override
         public void stateChanged(ChangeEvent e) {
-            if (e.getSource() instanceof JSlider) {
-                JSlider slider = (JSlider) e.getSource();
+            if (e.getSource() instanceof JSlider slider) {
                 if (!slider.getValueIsAdjusting() && slider.isVisible()) {
                     int value = slider.getValue();
 Debug.println("slider index: " + value);

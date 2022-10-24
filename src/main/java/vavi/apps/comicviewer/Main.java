@@ -115,7 +115,7 @@ Debug.println("close fs");
             }
         } else {
             // existing `CFProcessPath` means this program is executed by .app
-            if (app.isMac() && System.getenv("CFProcessPath") != null) {
+            if (Main.isMac() && System.getenv("CFProcessPath") != null) {
                 try {
                     // https://alvinalexander.com/blog/post/jfc-swing/java-handle-drag-drop-events-mac-osx-dock-application-icon-2/
                     Application application = Application.getApplication();
@@ -187,9 +187,7 @@ Debug.println(Level.FINE, "path: " + path.getFileName() + (Files.isDirectory(pat
         try {
             if (!Files.isSameFile(p, path)) {
                 JMenuItem mi = new JMenuItem(p.getFileName().toString());
-                mi.addActionListener(e -> {
-                    init(p, 0);
-                });
+                mi.addActionListener(e -> init(p, 0));
                 menu.add(mi);
 Debug.println("add menuItem: " + mi.getText());
             }
@@ -219,7 +217,7 @@ Debug.println("remove menuItem: " + menu.getItemCount());
         recent.forEach(p -> addMenuItemTo(openRecentMenu, p));
     }
 
-    private Thread minThreadFactory(Runnable r) {
+    private static Thread minThreadFactory(Runnable r) {
         Thread thread = new Thread(r);
         thread.setPriority(Thread.MIN_PRIORITY);
         return thread;
@@ -261,7 +259,7 @@ Debug.println("images: " + images.size());
             clearMenuItems(openRecentMenu);
             updateOpenRecentMenu();
 
-            es = Executors.newSingleThreadExecutor(this::minThreadFactory);
+            es = Executors.newSingleThreadExecutor(Main::minThreadFactory);
             es.submit(() -> {
                 // don't disturb before first 2 pages are shown
                 try {
@@ -424,12 +422,12 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
                 index + 1 < images.size() ? abbreviate(images.get(index + 1), 17) : "");
     }
 
-    boolean isMac() {
+    static boolean isMac() {
         String osName = System.getProperty("os.name").toLowerCase();
         return osName.contains("mac");
     }
 
-    public boolean isFullScreen(Window window) {
+    public static boolean isFullScreen(Window window) {
         Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
 Debug.println("isFullScreen: " + (size.width == window.getWidth() && size.height == window.getHeight()));
         return size.width == window.getWidth() && size.height == window.getHeight();
@@ -514,7 +512,7 @@ Debug.println("componentResized: " + e.getComponent().getBounds());
         JMenu filterMenu = new JMenu("Filter");
         loader.forEach(filter -> {
             JCheckBoxMenuItem filterMenuItem = new JCheckBoxMenuItem(filter.getName());
-            filterMenuItem.addActionListener(e -> { updateModel(); });
+            filterMenuItem.addActionListener(e -> updateModel());
             filterMenuItems.put(filter, filterMenuItem);
             filterMenu.add(filterMenuItem);
         });

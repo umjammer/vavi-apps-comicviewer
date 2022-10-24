@@ -74,6 +74,7 @@ Debug.println(virtualRoot);
                 try {
                     StringBuilder sb = new StringBuilder();
 
+                    //noinspection unchecked
                     Path path = Paths.get(((List<File>) clipboard.getData(DataFlavor.javaFileListFlavor)).get(0).getPath());
 
                     sb.append(path);
