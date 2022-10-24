@@ -34,8 +34,9 @@ this is a stopgap until Ventura (support avif natively) release.
 ## Remarkable Points
 
  * avif
- * drop and open via dock icon (mac java)
- * resizing smaller/larger keeping aspect ratio component
+ * drop and open via dock icon (how to use mac specific capability on java)
+ * resizing smaller/larger keeping aspect ratio component w/ magnifying glass
+ * brought you as mac .app by jpackager (how to create mac .app by java)
 
 ## TODO
 
@@ -45,6 +46,12 @@ this is a stopgap until Ventura (support avif natively) release.
      * ~~`-Dapple.awt.application.name=Foo` doesn't work~~
      * use `macConfig.infoPlist.additionalEntries` key:`CFBundleName`
    * `macConfig.icnsFile` doesn't work?
+   * `macConfig.codesignApp` true -> need `sudo` on my env -> dir removal failure
+     * CONCLUSION: no need to sign
+   * entitlement 
+     * `macConfig.entitlements` no value: use default
+     * Info.plist [sandbox](https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/EnablingAppSandbox.html)
+     * CONCLUSION: no need to prepare entitlement
  * drop into mac application
    * info.plist? -> right, use `CFBundleTypeExtensions` for accepting to drop
    * `CFProcessPath`? -> env
@@ -57,3 +64,4 @@ this is a stopgap until Ventura (support avif natively) release.
    * https://github.com/umjammer/jflow 
  * https://github.com/ymasory/OrangeExtensions
  * https://github.com/dmMaze/comic-text-detector
+ * suspend dnnsuperres bec not effective
