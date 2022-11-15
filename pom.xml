@@ -11,7 +11,7 @@
     <javapackager.name>zzzViewer</javapackager.name>
     <javapackager.assetsDir>src/main/package</javapackager.assetsDir>
     <rococoa.version>0.8.5-SNAPSHOT</rococoa.version>
-    <javacpp.platform>macosx-x86_64</javacpp.platform>
+    <javacpp.platform>macosx-${os.arch}</javacpp.platform>
   </properties>
 
   <name>${javapackager.assetsDir}</name>
@@ -206,7 +206,7 @@
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
-        <version>5.9.0</version>
+        <version>5.9.1</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -217,12 +217,12 @@
     <dependency>
       <groupId>com.github.umjammer</groupId>
       <artifactId>vavi-commons</artifactId>
-      <version>1.1.7</version>
+      <version>1.1.8</version>
     </dependency>
     <dependency>
-      <groupId>vavi</groupId>
+      <groupId>com.github.umjammer.vavi-apps-fuse</groupId>
       <artifactId>vavi-nio-file-archive</artifactId>
-      <version>0.1.8-SNAPSHOT</version>
+      <version>0.1.8</version>
       <exclusions>
         <exclusion>
           <groupId>org.jetbrains.kotlin</groupId>
@@ -238,6 +238,11 @@
       <groupId>com.github.umjammer</groupId>
       <artifactId>vavi-image-avif</artifactId>
       <version>0.0.2</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.umjammer</groupId>
+      <artifactId>vavi-image-jpegxl</artifactId>
+      <version>0.0.4</version>
     </dependency>
     <dependency>
       <groupId>com.github.umjammer</groupId>
@@ -263,7 +268,7 @@
     <dependency>
       <groupId>vavi</groupId>
       <artifactId>vavi-image-filter-dnnsuperres</artifactId>
-      <version>1.0.1-SNAPSHOT</version>
+      <version>1.0.1</version>
     </dependency>
     <dependency> <!-- why not included -->
       <groupId>org.bytedeco</groupId>

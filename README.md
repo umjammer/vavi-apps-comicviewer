@@ -1,7 +1,7 @@
 [![Release](https://jitpack.io/v/umjammer/vavi-apps-comicviewer.svg)](https://jitpack.io/#umjammer/vavi-apps-comicviewer)
 [![Java CI](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven.yml)
 [![CodeQL](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/codeql-analysis.yml)
-![Java](https://img.shields.io/badge/Java-8-b07219)
+![Java](https://img.shields.io/badge/Java-17-b07219)
 
 # vavi-apps-comicviewer
 
@@ -33,7 +33,7 @@ this is a stopgap until Ventura (support avif natively) release.
 
 ## Remarkable Points
 
- * avif
+ * avif, jpeg-xl
  * drop and open via dock icon (how to use mac specific capability on java)
  * resizing smaller/larger keeping aspect ratio component w/ magnifying glass
  * brought you as mac .app by jpackager (how to create mac .app by java)
@@ -65,3 +65,6 @@ this is a stopgap until Ventura (support avif natively) release.
  * https://github.com/ymasory/OrangeExtensions
  * https://github.com/dmMaze/comic-text-detector
  * suspend dnnsuperres bec not effective
+ * paging
+   * connected page detection (facing page)
+   * left to right
