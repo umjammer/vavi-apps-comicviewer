@@ -89,7 +89,7 @@ public class Main {
      * @param args none
      */
     public static void main(String[] args) throws Exception {
-
+try {
         Main app = new Main();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 Debug.println("shutdownHook");
@@ -147,6 +147,11 @@ Debug.println(Level.FINE, "files: " + files.size() + ", " + (files.size() > 0 ? 
                 }
             }
         }
+} catch (Throwable t) {
+ Debug.printStackTrace(Level.SEVERE, t);
+ if (t.getCause() != null)
+  Debug.printStackTrace(Level.SEVERE, t.getCause());
+}
     }
 
     static final String[] imageExts;

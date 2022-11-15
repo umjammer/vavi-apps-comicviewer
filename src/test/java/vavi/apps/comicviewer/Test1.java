@@ -21,6 +21,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.swing.JOptionPane;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +66,7 @@ Debug.println(virtualRoot);
                 .filter(Main::isImage)
                 .sorted()
                 .forEach(System.err::println);
+        fs.close();
     }
 
     void test2() throws Exception {
