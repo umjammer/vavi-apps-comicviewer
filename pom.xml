@@ -10,7 +10,7 @@
   <properties>
     <javapackager.name>zzzViewer</javapackager.name>
     <javapackager.assetsDir>src/main/package</javapackager.assetsDir>
-    <rococoa.version>0.8.5-SNAPSHOT</rococoa.version>
+    <rococoa.version>0.8.5</rococoa.version>
     <javacpp.platform>macosx-${os.arch}</javacpp.platform>
   </properties>
 
