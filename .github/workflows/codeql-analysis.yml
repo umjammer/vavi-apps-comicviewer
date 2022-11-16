@@ -65,8 +65,8 @@ jobs:
       run: |
         brew install libavif jpeg-xl
         mvn -B package --file pom.xml -s $GITHUB_WORKSPACE/settings.xml -Dmaven.test.skip=true
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
