@@ -16,6 +16,109 @@
 
   <name>${javapackager.assetsDir}</name>
 
+  <profiles>
+    <profile>
+      <id>local (not on github workflow)</id>
+      <activation>
+        <property>
+          <name>!env.GITHUB_WORKFLOW</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>io.github.fvarrui</groupId>
+            <artifactId>javapackager</artifactId>
+            <version>1.7.0-SNAPSHOT</version>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>package</goal>
+                </goals>
+                <configuration>
+                  <name>${javapackager.name}</name>
+                  <organizationName>Copyright © 2022 by vavi, All rights reserved.</organizationName>
+
+                  <mainClass>vavi.apps.comicviewer.Main</mainClass>
+                  <runnableJar>${project.artifactId}-${project.version}.jar</runnableJar>
+                  <generateInstaller>false</generateInstaller>
+                  <bundleJre>true</bundleJre>
+                  <jrePath>${java.home}</jrePath>
+
+                  <assetsDir>${javapackager.assetsDir}</assetsDir>
+
+                  <additionalResources>
+                    <additionalResource>${project.build.outputDirectory}/logging.properties</additionalResource>
+                    <additionalResource>${project.build.testOutputDirectory}/librococoa.dylib</additionalResource>
+                  </additionalResources>
+
+                  <vmArgs>
+                    <vmArg>--add-opens</vmArg>
+                    <vmArg>java.desktop/com.apple.eawt=ALL-UNNAMED</vmArg>
+                    <vmArg>--add-opens</vmArg>
+                    <vmArg>java.base/java.lang=ALL-UNNAMED</vmArg>
+                    <vmArg>-Djna.library.path=/usr/local/lib:.</vmArg>
+                    <vmArg>-Dapple.laf.useScreenMenuBar=true</vmArg>
+                    <vmArg>-Djava.util.logging.config.file=./logging.properties</vmArg>
+                  </vmArgs>
+
+                  <macConfig>
+                    <!-- true cause error -->
+                    <codesignApp>false</codesignApp>
+                    <infoPlist>
+                      <additionalEntries>
+                        <![CDATA[
+                      <key>CFBundleName</key>
+                      <string>${javapackager.name}</string>
+                      <key>CFBundleShortVersionString</key>
+                      <string>${git.build.time}</string>
+                      <key>CFBundleDocumentTypes</key>
+                      <array>
+                        <dict>
+                          <key>CFBundleTypeExtensions</key>
+                          <array>
+                            <string>zip</string>
+                            <string>ZIP</string>
+                          </array>
+                          <key>CFBundleTypeName</key>
+                          <string>ZIP Archive</string>
+                          <key>CFBundleTypeRole</key>
+                          <string>Viewer</string>
+                          <key>LSTypeIsPackage</key>
+                          <false/>
+                          <key>NSPersistentStoreTypeKey</key>
+                          <string>Binary</string>
+                        </dict>
+                        <dict>
+                          <key>CFBundleTypeExtensions</key>
+                          <array>
+                            <string>rar</string>
+                            <string>RAR</string>
+                          </array>
+                          <key>CFBundleTypeName</key>
+                          <string>RAR Archive</string>
+                          <key>CFBundleTypeRole</key>
+                          <string>Viewer</string>
+                          <key>LSTypeIsPackage</key>
+                          <false/>
+                          <key>NSPersistentStoreTypeKey</key>
+                          <string>Binary</string>
+                        </dict>
+                      </array>
+                    ]]>
+                      </additionalEntries>
+                    </infoPlist>
+                  </macConfig>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
   <build>
     <plugins>
       <plugin>
@@ -82,95 +185,6 @@
           </includeOnlyProperties>
           <commitIdGenerationMode>full</commitIdGenerationMode>
         </configuration>
-      </plugin>
-
-      <plugin>
-        <groupId>io.github.fvarrui</groupId>
-        <artifactId>javapackager</artifactId>
-        <version>1.7.0-SNAPSHOT</version>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>package</goal>
-            </goals>
-            <configuration>
-              <name>${javapackager.name}</name>
-              <organizationName>Copyright © 2022 by vavi, All rights reserved.</organizationName>
-
-              <mainClass>vavi.apps.comicviewer.Main</mainClass>
-              <runnableJar>${project.artifactId}-${project.version}.jar</runnableJar>
-              <generateInstaller>false</generateInstaller>
-              <bundleJre>true</bundleJre>
-              <jrePath>${java.home}</jrePath>
-
-              <assetsDir>${javapackager.assetsDir}</assetsDir>
-
-              <additionalResources>
-                <additionalResource>${project.build.outputDirectory}/logging.properties</additionalResource>
-                <additionalResource>${project.build.testOutputDirectory}/librococoa.dylib</additionalResource>
-              </additionalResources>
-
-              <vmArgs>
-                <vmArg>--add-opens</vmArg>
-                <vmArg>java.desktop/com.apple.eawt=ALL-UNNAMED</vmArg>
-                <vmArg>--add-opens</vmArg>
-                <vmArg>java.base/java.lang=ALL-UNNAMED</vmArg>
-                <vmArg>-Djna.library.path=/usr/local/lib:.</vmArg>
-                <vmArg>-Dapple.laf.useScreenMenuBar=true</vmArg>
-                <vmArg>-Djava.util.logging.config.file=./logging.properties</vmArg>
-              </vmArgs>
-
-              <macConfig>
-                <!-- true cause error -->
-                <codesignApp>false</codesignApp>
-                <infoPlist>
-                  <additionalEntries>
-                    <![CDATA[
-                      <key>CFBundleName</key>
-                      <string>${javapackager.name}</string>
-                      <key>CFBundleShortVersionString</key>
-                      <string>${git.build.time}</string>
-                      <key>CFBundleDocumentTypes</key>
-                      <array>
-                        <dict>
-                          <key>CFBundleTypeExtensions</key>
-                          <array>
-                            <string>zip</string>
-                            <string>ZIP</string>
-                          </array>
-                          <key>CFBundleTypeName</key>
-                          <string>ZIP Archive</string>
-                          <key>CFBundleTypeRole</key>
-                          <string>Viewer</string>
-                          <key>LSTypeIsPackage</key>
-                          <false/>
-                          <key>NSPersistentStoreTypeKey</key>
-                          <string>Binary</string>
-                        </dict>
-                        <dict>
-                          <key>CFBundleTypeExtensions</key>
-                          <array>
-                            <string>rar</string>
-                            <string>RAR</string>
-                          </array>
-                          <key>CFBundleTypeName</key>
-                          <string>RAR Archive</string>
-                          <key>CFBundleTypeRole</key>
-                          <string>Viewer</string>
-                          <key>LSTypeIsPackage</key>
-                          <false/>
-                          <key>NSPersistentStoreTypeKey</key>
-                          <string>Binary</string>
-                        </dict>
-                      </array>
-                    ]]>
-                  </additionalEntries>
-                </infoPlist>
-              </macConfig>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
 
       <plugin>
