@@ -14,7 +14,12 @@
     <javacpp.platform>macosx-${os.arch}</javacpp.platform>
   </properties>
 
-  <name>${javapackager.assetsDir}</name>
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/umjammer/vavi-apps-comicviewer</url>
+    </repository>
+  </distributionManagement>
 
   <profiles>
     <profile>
