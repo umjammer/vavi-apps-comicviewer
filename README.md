@@ -1,4 +1,4 @@
-[![Release](https://jitpack.io/v/umjammer/vavi-apps-comicviewer.svg)](https://jitpack.io/#umjammer/vavi-apps-comicviewer)
+[![GitHub Packages](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven-publish.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven-publish.yml)
 [![Java CI](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven.yml)
 [![CodeQL](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/codeql-analysis.yml)
 ![Java](https://img.shields.io/badge/Java-17-b07219)
