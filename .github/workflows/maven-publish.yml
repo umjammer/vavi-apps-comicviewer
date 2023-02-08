@@ -1,4 +1,4 @@
-name: GitHub Packages
+name: GitHub Release Assets
 
 on:
   release:
@@ -23,11 +23,13 @@ jobs:
           settings-path: ${{ github.workspace }} # location for the settings.xml file
 
       - name: Build with Maven
-        run: mvn -B package --file pom.xml -s $GITHUB_WORKSPACE/settings.xml
+        run: mvn -B package -Dinstaller=true --file pom.xml -s $GITHUB_WORKSPACE/settings.xml -DskipTests
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Publish to GitHub Packages Apache Maven
-        run: mvn deploy -s $GITHUB_WORKSPACE/settings.xml -Dmaven.test.skip=true
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
+        with:
+          files: target/zzzViewer_${{ github.ref_name }}.dmg
