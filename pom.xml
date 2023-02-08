@@ -22,14 +22,8 @@
   </distributionManagement>
 
   <profiles>
-    <!-- TODO because of javapackager is snapshot -->
     <profile>
-      <id>local (not on github workflow)</id>
-      <activation>
-        <property>
-          <name>!env.GITHUB_WORKFLOW</name>
-        </property>
-      </activation>
+      <id>release</id>
       <properties>
         <installer>false</installer>
       </properties>
@@ -47,7 +41,7 @@
                 </goals>
                 <configuration>
                   <name>${javapackager.name}</name>
-                  <organizationName>Copyright © 2022 by vavi, All rights reserved.</organizationName>
+                  <organizationName>Copyright © 2023 by vavi, All rights reserved.</organizationName>
 
                   <mainClass>vavi.apps.comicviewer.Main</mainClass>
                   <runnableJar>${project.artifactId}-${project.version}.jar</runnableJar>
