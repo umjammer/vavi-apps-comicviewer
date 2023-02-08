@@ -5,7 +5,7 @@
 
   <groupId>vavi</groupId>
   <artifactId>vavi-apps-comicviewer</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
 
   <properties>
     <javapackager.name>zzzViewer</javapackager.name>
@@ -22,6 +22,7 @@
   </distributionManagement>
 
   <profiles>
+    <!-- TODO because of javapackager is snapshot -->
     <profile>
       <id>local (not on github workflow)</id>
       <activation>
@@ -34,7 +35,7 @@
           <plugin>
             <groupId>io.github.fvarrui</groupId>
             <artifactId>javapackager</artifactId>
-            <version>1.7.0-SNAPSHOT</version>
+            <version>1.7.0</version>
             <executions>
               <execution>
                 <phase>package</phase>
@@ -225,7 +226,7 @@
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
-        <version>5.9.1</version>
+        <version>5.9.2</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -236,7 +237,7 @@
     <dependency>
       <groupId>com.github.umjammer</groupId>
       <artifactId>vavi-commons</artifactId>
-      <version>1.1.8</version>
+      <version>1.1.9</version>
     </dependency>
     <dependency>
       <groupId>com.github.umjammer.vavi-apps-fuse</groupId>
@@ -256,7 +257,7 @@
     <dependency>
       <groupId>com.github.umjammer</groupId>
       <artifactId>vavi-image-avif</artifactId>
-      <version>0.0.2</version>
+      <version>0.0.3</version>
     </dependency>
     <dependency>
       <groupId>com.github.umjammer</groupId>

@@ -41,18 +41,18 @@ this is a stopgap until Ventura (support avif natively) release.
 ## TODO
 
  * ~~resizing when the window is larger than an image~~
- * [jpackager](https://github.com/fvarrui/JavaPackager)
+ * ~~[jpackager](https://github.com/fvarrui/JavaPackager)~~
    * application title
      * ~~`-Dapple.awt.application.name=Foo` doesn't work~~
      * use `macConfig.infoPlist.additionalEntries` key:`CFBundleName`
    * `macConfig.icnsFile` doesn't work?
    * `macConfig.codesignApp` true -> need `sudo` on my env -> dir removal failure
      * CONCLUSION: no need to sign
-   * entitlement 
+   * ~~entitlement~~ 
      * `macConfig.entitlements` no value: use default
      * Info.plist [sandbox](https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/EnablingAppSandbox.html)
      * CONCLUSION: no need to prepare entitlement
- * drop into mac application
+ * ~~drop into mac application~~
    * info.plist? -> right, use `CFBundleTypeExtensions` for accepting to drop
    * `CFProcessPath`? -> env
    * info.plist `:Javax:JVMVersion` doesn't work -> bundle jdk
