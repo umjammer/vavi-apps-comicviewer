@@ -24,6 +24,11 @@
   <profiles>
     <profile>
       <id>release</id>
+      <activation>
+        <os>
+          <family>mac</family>
+        </os>
+      </activation>
       <properties>
         <installer>false</installer>
       </properties>
