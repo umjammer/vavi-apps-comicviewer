@@ -46,7 +46,7 @@ this is a stopgap until Ventura (support avif natively) release.
      * ~~`-Dapple.awt.application.name=Foo` doesn't work~~
      * use `macConfig.infoPlist.additionalEntries` key:`CFBundleName`
    * `macConfig.icnsFile` doesn't work?
-   * `macConfig.codesignApp` true -> need `sudo` on my env -> dir removal failure
+   * `macConfig.codesignApp` true -> need `sudo` on my env ~~-> dir removal failure~~
      * CONCLUSION: no need to sign
    * ~~entitlement~~ 
      * `macConfig.entitlements` no value: use default
@@ -55,7 +55,7 @@ this is a stopgap until Ventura (support avif natively) release.
  * ~~drop into mac application~~
    * info.plist? -> right, use `CFBundleTypeExtensions` for accepting to drop
    * `CFProcessPath`? -> env
-   * info.plist `:Javax:JVMVersion` doesn't work -> bundle jdk
+   * ~~info.plist `:Javax:JVMVersion` doesn't work -> bundle jdk~~ ->j reMinVersion
  * ~~recent opened files menu~~
    * wip: not work on .app
  * ~~sibling files menu~~
@@ -68,3 +68,5 @@ this is a stopgap until Ventura (support avif natively) release.
  * paging
    * connected page detection (facing page)
    * left to right
+ * ~~release~~
+   * ~~not maven-deploy but release executable~~ 

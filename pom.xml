@@ -5,7 +5,7 @@
 
   <groupId>vavi</groupId>
   <artifactId>vavi-apps-comicviewer</artifactId>
-  <version>0.0.2</version>
+  <version>0.0.3</version>
 
   <properties>
     <javapackager.name>zzzViewer</javapackager.name>
@@ -30,6 +30,9 @@
           <name>!env.GITHUB_WORKFLOW</name>
         </property>
       </activation>
+      <properties>
+        <installer>false</installer>
+      </properties>
       <build>
         <plugins>
           <plugin>
@@ -48,9 +51,9 @@
 
                   <mainClass>vavi.apps.comicviewer.Main</mainClass>
                   <runnableJar>${project.artifactId}-${project.version}.jar</runnableJar>
-                  <generateInstaller>false</generateInstaller>
-                  <bundleJre>true</bundleJre>
-                  <jrePath>${java.home}</jrePath>
+                  <generateInstaller>${installer}</generateInstaller>
+                  <bundleJre>false</bundleJre>
+                  <jreMinVersion>17</jreMinVersion>
 
                   <assetsDir>${javapackager.assetsDir}</assetsDir>
 
@@ -72,6 +75,7 @@
                   <macConfig>
                     <!-- true cause error -->
                     <codesignApp>false</codesignApp>
+                    <generatePkg>false</generatePkg>
                     <infoPlist>
                       <additionalEntries>
                         <![CDATA[
