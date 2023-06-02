@@ -1,13 +1,15 @@
-[![GitHub Packages](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven-publish.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven-publish.yml)
+[![GitHub Release Assets](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven-publish.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven-publish.yml)
 [![Java CI](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/maven.yml)
 [![CodeQL](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/umjammer/vavi-apps-comicviewer/actions/workflows/codeql-analysis.yml)
 ![Java](https://img.shields.io/badge/Java-17-b07219)
 
 # vavi-apps-comicviewer
 
-<a href="https://brandmark.io/"><image src="https://repository-images.githubusercontent.com/534397011/27e695b5-6224-4edd-8fb8-d8dbf8bd14b8" width="640"/></a>
+aka zzzViewer
 
-the comic viewer avif supported.<br/>
+<img src="https://github.com/umjammer/vavi-apps-comicviewer/assets/493908/140be802-92ea-4aeb-9f4b-b73308874c3c" width="120" alt="zzzViewer logo"/>
+
+the comic viewer **avif** supported.<br/>
 this is a stopgap until Ventura (support avif natively) release.
 
 ## Usage
@@ -55,7 +57,7 @@ this is a stopgap until Ventura (support avif natively) release.
  * ~~drop into mac application~~
    * info.plist? -> right, use `CFBundleTypeExtensions` for accepting to drop
    * `CFProcessPath`? -> env
-   * ~~info.plist `:Javax:JVMVersion` doesn't work -> bundle jdk~~ ->j reMinVersion
+   * ~~info.plist `:Javax:JVMVersion` doesn't work -> bundle jdk~~ -> jreMinVersion
  * ~~recent opened files menu~~
    * wip: not work on .app
  * ~~sibling files menu~~
@@ -66,7 +68,7 @@ this is a stopgap until Ventura (support avif natively) release.
  * https://github.com/dmMaze/comic-text-detector
  * suspend dnnsuperres bec not effective
  * paging
-   * connected page detection (facing page)
+   * ~~connected page detection (facing page)~~
    * left to right
  * ~~release~~
    * ~~not maven-deploy but release executable~~ 
