@@ -44,6 +44,7 @@ class Pager {
         this.jump = jump;
     }
 
+    /** deals all events about paging (mouse, key, slider) */
     private static class PagingAdapter extends MouseAdapter implements MouseListener, KeyListener, ChangeListener {
         @Override public void keyTyped(KeyEvent e) {
         }
@@ -55,6 +56,7 @@ class Pager {
         }
     }
 
+    /** deals all events about paging (mouse, key, slider) */
     private final PagingAdapter pagingAdapter = new PagingAdapter() {
         @Override
         public void keyPressed(KeyEvent e) {
@@ -92,6 +94,7 @@ class Pager {
             }
         }
 
+        /** for slider */
         @Override
         public void stateChanged(ChangeEvent e) {
             if (e.getSource() instanceof JSlider slider) {
@@ -104,6 +107,7 @@ Debug.println("slider index: " + value);
         }
     };
 
+    /** deals all events about paging (mouse, key, slider) */
     public PagingAdapter getPagingAdapter() {
         return pagingAdapter;
     }
