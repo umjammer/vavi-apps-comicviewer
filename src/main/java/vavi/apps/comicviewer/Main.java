@@ -92,14 +92,14 @@ public class Main {
         try {
             Main app = new Main();
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                Debug.println("shutdownHook");
+Debug.println("shutdownHook");
                 app.prefs.putInt("lastIndex", app.index);
                 app.storeBounds();
                 app.prefs.put("lastPath", String.valueOf(app.path));
                 if (app.fs != null) {
                     try {
                         app.fs.close();
-                        Debug.println("close fs");
+Debug.println("close fs");
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -123,7 +123,7 @@ public class Main {
                         application.setOpenFileHandler(openFilesEvent -> {
                             List<File> files = openFilesEvent.getFiles();
                             // TODO file name is weired
-                            Debug.println(Level.FINE, "files: " + files.size() + ", " + (files.size() > 0 ? files.get(0) : ""));
+Debug.println(Level.FINE, "files: " + files.size() + ", " + (files.size() > 0 ? files.get(0) : ""));
                             app.init(Paths.get(files.get(0).getPath()), 0);
                         });
                     } catch (Throwable ex) {
@@ -148,9 +148,9 @@ public class Main {
                 }
             }
         } catch (Throwable t) {
-            Debug.printStackTrace(Level.SEVERE, t);
+Debug.printStackTrace(Level.SEVERE, t);
             if (t.getCause() != null)
-                Debug.printStackTrace(Level.SEVERE, t.getCause());
+Debug.printStackTrace(Level.SEVERE, t.getCause());
         }
     }
 
@@ -160,9 +160,9 @@ public class Main {
 
     static {
         imageExts = ImageIO.getReaderFileSuffixes();
-        Debug.println("available images: " + Arrays.toString(imageExts));
+Debug.println("available images: " + Arrays.toString(imageExts));
         archiveExts = Archives.getReaderFileSuffixes();
-        Debug.println("available archives: " + Arrays.toString(archiveExts));
+Debug.println("available archives: " + Arrays.toString(archiveExts));
     }
 
     static String getExt(Path path) {
@@ -175,7 +175,7 @@ public class Main {
     }
 
     static boolean isImage(Path path) {
-        Debug.println(Level.FINE, "path: " + path.getFileName() + (Files.isDirectory(path) ? "" : ", " + getExt(path)));
+Debug.println(Level.FINE, "path: " + path.getFileName() + (Files.isDirectory(path) ? "" : ", " + getExt(path)));
         return !Files.isDirectory(path) && Arrays.asList(imageExts).contains(getExt(path));
     }
 
@@ -194,7 +194,7 @@ public class Main {
                 JMenuItem mi = new JMenuItem(p.getFileName().toString());
                 mi.addActionListener(e -> init(p, 0));
                 menu.add(mi);
-                Debug.println("add menuItem: " + mi.getText());
+Debug.println("add menuItem: " + mi.getText());
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -207,7 +207,7 @@ public class Main {
             mis.add(menu.getItem(i));
         }
         for (JMenuItem mi : mis) {
-            Debug.println("remove menuItem: " + mi);
+Debug.println("remove menuItem: " + mi);
             menu.remove(mi);
         }
         Debug.println("remove menuItem: " + menu.getItemCount());
@@ -240,19 +240,19 @@ public class Main {
                 virtualRoot = path;
             } else {
                 URI uri = URI.create("archive:" + path.toUri());
-                Debug.println("open fs: " + uri);
+Debug.println("open fs: " + uri);
                 if (fs != null) {
                     fs.close();
                 }
                 fs = FileSystems.newFileSystem(uri, Collections.emptyMap());
                 virtualRoot = fs.getRootDirectories().iterator().next();
             }
-            Debug.println(virtualRoot);
+Debug.println(virtualRoot);
             Files.walk(virtualRoot)
                     .filter(Main::isImage)
                     .sorted()
                     .forEach(images::add);
-            Debug.println("images: " + images.size());
+Debug.println("images: " + images.size());
 
             frame.setTitle("zzzViewer - " + path.getFileName());
             updateModel();
@@ -281,7 +281,7 @@ public class Main {
                     // create gap for paging
                     Thread.yield();
                 }
-                Debug.println("CACHE: done");
+Debug.println("CACHE: done");
                 es.shutdown();
             });
         } catch (IOException e) {
@@ -290,19 +290,17 @@ public class Main {
     }
 
     BufferedImage getImage(int i) {
-        synchronized (cache) {
-            BufferedImage image = cache.get(i);
-            if (image == null) {
-                try {
-                    Debug.println("CACHE: " + i + ": " + images.get(i));
-                    image = ImageIO.read(Files.newInputStream(images.get(i)));
-                    cache.put(i, image);
-                } catch (IOException e) {
-                    Debug.println(e.getMessage());
-                }
+        return getImage(i, false);
+        if (image == null) {
+            try {
+Debug.println("CACHE: " + i + ": " + images.get(i));
+                image = ImageIO.read(Files.newInputStream(images.get(i)));
+                cache.put(i, image);
+            } catch (IOException e) {
+Debug.println(e.getMessage());
             }
-            return image;
         }
+        return image;
     }
 
     // app
@@ -312,7 +310,7 @@ public class Main {
 
     // view-model
     List<Path> images = new ArrayList<>();
-    final Map<Integer, BufferedImage> cache = new HashMap<>();
+    Map<Integer, BufferedImage> cache = new ConcurrentHashMap<>();
     static final int RECENT = 10;
     List<Path> recent = new ArrayList<>(RECENT);
     Map<Object, Object> hints;
@@ -358,9 +356,9 @@ public class Main {
     BufferedImage getFilteredImage(int index) {
         BufferedImage image = getImage(index);
         for (Filter filter : filterMenuItems.keySet()) {
-            Debug.println(Level.FINER, "filter: " + filter.getName() + ", " + filterMenuItems.get(filter).isSelected());
+Debug.println(Level.FINER, "filter: " + filter.getName() + ", " + filterMenuItems.get(filter).isSelected());
             if (filterMenuItems.get(filter).isSelected()) {
-                Debug.println(Level.FINER, "using filter: " + filter.getName());
+Debug.println(Level.FINER, "using filter: " + filter.getName());
                 image = filter.filter(image);
             }
         }
@@ -370,7 +368,7 @@ public class Main {
     void updateModel() {
         frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-        Debug.println("index: " + index);
+Debug.println("index: " + index);
         imageR.setImage(index < images.size() ? getFilteredImage(index) : null);
         imageL.setImage(index + 1 < images.size() ? getFilteredImage(index + 1) : null);
 
@@ -401,7 +399,7 @@ public class Main {
             return true;
         } catch (IllegalArgumentException e) {
             if (e.getMessage().equals("MALFORMED")) {
-                Debug.println("zip reading failure by utf-8, retry using ms932");
+Debug.println("zip reading failure by utf-8, retry using ms932");
                 System.setProperty(JdkZipArchive.ZIP_ENCODING, "ms932");
                 init(path, 0);
                 return true;
@@ -434,7 +432,7 @@ public class Main {
 
     public static boolean isFullScreen(Window window) {
         Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
-        Debug.println("isFullScreen: " + (size.width == window.getWidth() && size.height == window.getHeight()));
+Debug.println("isFullScreen: " + (size.width == window.getWidth() && size.height == window.getHeight()));
         return size.width == window.getWidth() && size.height == window.getHeight();
     }
 
@@ -449,7 +447,7 @@ public class Main {
                 gd.setFullScreenWindow(frame); // TODO how to off?
             }
         }
-        Debug.println(Level.FINE, "fullScreen: " + enabled);
+Debug.println(Level.FINE, "fullScreen: " + enabled);
     }
 
     Rectangle restoreBounds() {
@@ -488,7 +486,7 @@ public class Main {
         });
         frame.addComponentListener(new ComponentAdapter() {
             @Override public void componentResized(ComponentEvent e) {
-                Debug.println("componentResized: " + e.getComponent().getBounds());
+Debug.println("componentResized: " + e.getComponent().getBounds());
                 glass.setSize(base.getSize());
                 pages.setSize(base.getSize());
                 fullScreen.setSelected(isFullScreen(frame));
@@ -528,7 +526,7 @@ public class Main {
 
         frame.setJMenuBar(menuBar);
 
-        // TODO RootPaneContainer.html#getGlassPane()
+        // TODO RootPaneContainer#getGlassPane()
         glass = new JPanel() {
             {
                 Droppable.makeComponentSinglePathDroppable(this, Main.this::drop);
@@ -553,16 +551,16 @@ public class Main {
             JImageComponent comp = null;
             int dx = 0;
             if (imageL.getBounds().contains(p.x, p.y)) {
-                Debug.printf(Level.FINE, "mag left: " + imageL.getBounds());
+Debug.printf(Level.FINE, "mag left: " + imageL.getBounds());
                 comp = imageL;
             } else if (imageR.getBounds().contains(p.x, p.y)) {
-                Debug.printf(Level.FINE, "mag right: " + imageR.getBounds());
+Debug.printf(Level.FINE, "mag right: " + imageR.getBounds());
                 comp = imageR;
                 dx = Math.round(pages.getWidth() / 2f);
             }
             BufferedImage sub = null;
             if (comp != null) {
-                Debug.printf(Level.FINE, "mag area: %d, %d %d, %d", r.x - dx, r.y, r.width, r.height);
+Debug.printf(Level.FINE, "mag area: %d, %d %d, %d", r.x - dx, r.y, r.width, r.height);
                 sub = comp.getSubimage(r.x - dx, r.y, r.width, r.height);
             }
             return sub;
