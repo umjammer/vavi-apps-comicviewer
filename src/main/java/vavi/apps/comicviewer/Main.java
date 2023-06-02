@@ -6,6 +6,7 @@
 
 package vavi.apps.comicviewer;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -39,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -255,7 +257,7 @@ Debug.println(virtualRoot);
 Debug.println("images: " + images.size());
 
             frame.setTitle("zzzViewer - " + path.getFileName());
-            updateModel();
+            updateModel(true, false);
             clearMenuItems(openSiblingMenu);
             Files.list(path.getParent())
                     .filter(Main::isArchive)
@@ -291,6 +293,10 @@ Debug.println("CACHE: done");
 
     BufferedImage getImage(int i) {
         return getImage(i, false);
+    }
+
+    BufferedImage getImage(int i, boolean ignoreCache) {
+        BufferedImage image = ignoreCache ? null : cache.get(i);
         if (image == null) {
             try {
 Debug.println("CACHE: " + i + ": " + images.get(i));
@@ -316,12 +322,18 @@ Debug.println(e.getMessage());
     Map<Object, Object> hints;
     JImageComponent imageR;
     JImageComponent imageL;
+    JImageComponent imageC;
     JMenu openRecentMenu;
     JMenu openSiblingMenu;
+    int index = 0;
+    boolean right2left = true;
+    boolean prevPagingDirection;
+    GridLayout gridLayout;
 
     // view-controller
     JFrame frame;
     JLayeredPane base;
+    JPanel pageC;
     JPanel pages;
     JPanel glass;
     Jumper jumper;
@@ -330,31 +342,47 @@ Debug.println(e.getMessage());
 
     // model
     Path path;
-    int index = 0;
+    static final float threashold = 1.0f;
+
+    boolean isOpend(BufferedImage image) {
+Debug.println("isOpen: " + (float) image.getHeight() / image.getWidth() + ", " + threashold);
+        return (float) image.getWidth() / image.getHeight() > threashold;
+    }
 
     void nextPage(int d) {
+        nextPage(d, false);
+    }
+
+    void nextPage(int d, boolean ignoreCache) {
         if (index + d < images.size() - 1) {
             index += d;
-            updateModel();
+            updateModel(true, ignoreCache);
+        } else if (index + 1 < images.size() - 1) {
+            index++;
+            updateModel(true, ignoreCache);
         }
     }
 
     void prevPage(int d) {
         if (index >= d) {
             index -= d;
-            updateModel();
+            updateModel(false, false);
+        } else if (index == 1) {
+            index--;
+            updateModel(false, false);
         }
     }
 
     void updateView() {
+        jumper.setValue(index);
         frame.validate();
         frame.repaint();
 //Debug.println("glass: " + glass.getBounds());
 //Debug.println("base: " + base.getBounds());
     }
 
-    BufferedImage getFilteredImage(int index) {
-        BufferedImage image = getImage(index);
+    BufferedImage getFilteredImage(int index, boolean ignoreCache) {
+        BufferedImage image = getImage(index, ignoreCache);
         for (Filter filter : filterMenuItems.keySet()) {
 Debug.println(Level.FINER, "filter: " + filter.getName() + ", " + filterMenuItems.get(filter).isSelected());
             if (filterMenuItems.get(filter).isSelected()) {
@@ -365,12 +393,38 @@ Debug.println(Level.FINER, "using filter: " + filter.getName());
         return image;
     }
 
-    void updateModel() {
+    void updateModel(boolean asc, boolean ignoreCache) {
         frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
 Debug.println("index: " + index);
-        imageR.setImage(index < images.size() ? getFilteredImage(index) : null);
-        imageL.setImage(index + 1 < images.size() ? getFilteredImage(index + 1) : null);
+        if (asc) {
+            BufferedImage rightImage = getFilteredImage(index, ignoreCache);
+            if (!isOpend(rightImage)) {
+                imageR.setImage(rightImage);
+                imageL.setImage(index + 1 < images.size() ? getFilteredImage(index + 1, ignoreCache) : null);
+                pageC.setVisible(false);
+            } else {
+                imageC.setImage(rightImage);
+                pageC.setVisible(true);
+                index--;
+            }
+        } else {
+            if (index + 1 < images.size()) {
+                BufferedImage leftImage = getFilteredImage(index + 1, ignoreCache);
+                if (!isOpend(leftImage)) {
+                    imageL.setImage(leftImage);
+                    imageR.setImage(getFilteredImage(index, ignoreCache));
+                    pageC.setVisible(false);
+                } else {
+                    imageC.setImage(leftImage);
+                    pageC.setVisible(true);
+                    index++;
+                }
+            } else {
+                pageC.setVisible(false);
+            }
+        }
+        prevPagingDirection = asc;
 
         frame.setCursor(Cursor.getDefaultCursor());
 
@@ -420,9 +474,13 @@ Debug.println("zip reading failure by utf-8, retry using ms932");
     }
 
     String label() {
-        return String.format("#%d-%d/%d (%s | %s)", index, index + 1, images.size(),
-                index < images.size() ? abbreviate(images.get(index), 17) : "",
-                index + 1 < images.size() ? abbreviate(images.get(index + 1), 17) : "");
+        String l1 = index < images.size() ? abbreviate(images.get(index), 17) : "";
+        String l2 = index + 1 < images.size() ? abbreviate(images.get(index + 1), 17) : "";
+        return pageC.isVisible()
+                ? String.format("#%d/%d (%s)", prevPagingDirection ? index : index + 1, images.size(), prevPagingDirection ? l2 : l1) // TODO check
+                : String.format("#%d-%d/%d (%s | %s)", index, index + 1, images.size(),
+                    right2left ? l2 : l1,
+                    right2left ? l1 : l2);
     }
 
     static boolean isMac() {
@@ -469,8 +527,12 @@ Debug.println(Level.FINE, "fullScreen: " + enabled);
                 e -> imageL.getBounds().contains(e.getPoint()),
                 e -> imageR.getBounds().contains(e.getPoint()),
                 i -> {
+                    boolean asc = index >= i;
                     index = i;
-                    updateModel();
+                    if (asc)
+                        nextPage(0);
+                    else
+                        prevPage(0);
 
                     jumper.setText(label());
                 });
@@ -481,6 +543,9 @@ Debug.println(Level.FINE, "fullScreen: " + enabled);
             @Override public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_F && e.isMetaDown()) {
                     setFullScreen(!fullScreen.isSelected());
+                } else if (e.getKeyCode() == KeyEvent.VK_R && e.isMetaDown()) {
+Debug.println("reload: " + index);
+                    nextPage(0, true);
                 }
             }
         });
@@ -489,6 +554,7 @@ Debug.println(Level.FINE, "fullScreen: " + enabled);
 Debug.println("componentResized: " + e.getComponent().getBounds());
                 glass.setSize(base.getSize());
                 pages.setSize(base.getSize());
+                pageC.setSize(base.getSize());
                 fullScreen.setSelected(isFullScreen(frame));
                 updateView();
             }
@@ -499,7 +565,7 @@ Debug.println("componentResized: " + e.getComponent().getBounds());
         openRecentMenu = new JMenu("Open Recent");
         openSiblingMenu = new JMenu("Open Sibling");
         JMenuItem closeMenu = new JMenuItem("Close");
-        closeMenu.addActionListener(e -> { clean(); updateModel(); });
+        closeMenu.addActionListener(e -> { clean(); updateModel(true, false); });
         JMenu fileMenu = new JMenu("File");
         fileMenu.add(openMenu);
         fileMenu.add(openRecentMenu);
@@ -515,7 +581,7 @@ Debug.println("componentResized: " + e.getComponent().getBounds());
         JMenu filterMenu = new JMenu("Filter");
         loader.forEach(filter -> {
             JCheckBoxMenuItem filterMenuItem = new JCheckBoxMenuItem(filter.getName());
-            filterMenuItem.addActionListener(e -> updateModel());
+            filterMenuItem.addActionListener(e -> updateModel(prevPagingDirection, false));
             filterMenuItems.put(filter, filterMenuItem);
             filterMenu.add(filterMenuItem);
         });
@@ -587,7 +653,8 @@ Debug.printf(Level.FINE, "mag area: %d, %d %d, %d", r.x - dx, r.y, r.width, r.he
 
         pages = new JPanel();
         pages.setBackground(Color.black);
-        pages.setLayout(new GridLayout(1, 2));
+        gridLayout = new GridLayout(1, 2);
+        pages.setLayout(gridLayout);
 
         hints = new HashMap<>();
         hints.put(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -605,9 +672,21 @@ Debug.printf(Level.FINE, "mag area: %d, %d %d, %d", r.x - dx, r.y, r.width, r.he
         pages.add(imageL);
         pages.add(imageR);
 
+        pageC = new JPanel();
+        pageC.setBackground(Color.black);
+        pageC.setLayout(new GridLayout(1, 1));
+
+        imageC = new JImageComponent();
+        imageC.setRenderingHints(hints);
+        imageC.setImageHorizontalAlignment(SwingConstants.CENTER);
+        imageC.setImageVerticalAlignment(SwingConstants.CENTER);
+
+        pageC.add(imageC, BorderLayout.CENTER);
+
         base = new JLayeredPane();
         base.setPreferredSize(new Dimension(w, h));
         base.add(glass);
+        base.add(pageC);
         base.add(pages);
 
         if (isMac()) {
